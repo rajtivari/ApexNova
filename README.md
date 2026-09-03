@@ -31,3 +31,9 @@ npm run dev
 ```
 
 The web app runs on `http://localhost:3000`; the API runs on `http://localhost:4000`.
+
+## Public web deployment
+
+The web app is configured as a static export for GitHub Pages. In the repository settings, set **Pages > Build and deployment > Source** to **GitHub Actions**. Each push to `main` then publishes the dashboard at `https://rajtivari.github.io/ApexNova/`.
+
+GitHub Pages hosts the frontend only. Deploy `apps/api` separately with a PostgreSQL database and set the frontend API URL when replacing the mock dashboard data.
