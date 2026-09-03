@@ -1,0 +1,223 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  WORKER
+  CAPTAIN
+  PLAYER
+}
+enum TournamentFormat {
+  BATTLE_ROYALE
+  ROUND_ROBIN
+  SINGLE_ELIMINATION
+}
+enum TournamentStatus {
+  DRAFT
+  PUBLISHED
+  REGISTRATION_OPEN
+  REGISTRATION_CLOSED
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+enum RegistrationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+enum ResultStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+enum TransactionType {
+  DEPOSIT
+  ENTRY_FEE
+  PRIZE_PAYOUT
+  WITHDRAWAL
+  REFERRAL_BONUS
+}
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+}
+enum DisputeStatus {
+  OPEN
+  RESOLVED
+  REJECTED
+}
+
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  passwordHash String
+  role Role @default(PLAYER)
+  createdAt DateTime @default(now())
+  profile Profile?
+  kyc Kyc?
+  wallet Wallet?
+  captainedTeams Team[]
+  teams TeamMember[]
+  results MatchResult[]
+  disputes Dispute[]
+  notifications Notification[]
+  referralsMade Referral[] @relation("referrer")
+  referralReceived Referral? @relation("referee")
+  transactions Transaction[]
+  auditLogs AuditLog[]
+}
+model Profile {
+  id String @id @default(cuid())
+  userId String @unique
+  displayName String
+  user User @relation(fields: [userId], references: [id])
+}
+model Kyc {
+  id String @id @default(cuid())
+  userId String @unique
+  encryptedAadhaar String
+  maskedAadhaar String
+  status String @default("PENDING")
+  user User @relation(fields: [userId], references: [id])
+}
+model Wallet {
+  id String @id @default(cuid())
+  userId String @unique
+  balance Decimal @default(0)
+  user User @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+}
+model Transaction {
+  id String @id @default(cuid())
+  walletId String
+  userId String
+  type TransactionType
+  amount Decimal
+  status TransactionStatus @default(COMPLETED)
+  wallet Wallet @relation(fields: [walletId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+}
+model Team {
+  id String @id @default(cuid())
+  name String
+  captainId String
+  captain User @relation(fields: [captainId], references: [id])
+  members TeamMember[]
+  registrations TournamentRegistration[]
+}
+model TeamMember {
+  id String @id @default(cuid())
+  teamId String
+  userId String
+  team Team @relation(fields: [teamId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+  @@unique([teamId, userId])
+}
+model Tournament {
+  id String @id @default(cuid())
+  name String
+  game String
+  format TournamentFormat
+  status TournamentStatus @default(DRAFT)
+  entryFee Decimal @default(0)
+  prizePool Decimal @default(0)
+  startsAt DateTime
+  registrationClosesAt DateTime
+  registrations TournamentRegistration[]
+  matches Match[]
+  standings Standing[]
+}
+model TournamentRegistration {
+  id String @id @default(cuid())
+  tournamentId String
+  teamId String
+  status RegistrationStatus @default(PENDING)
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+  team Team @relation(fields: [teamId], references: [id])
+  @@unique([tournamentId, teamId])
+}
+model Match {
+  id String @id @default(cuid())
+  tournamentId String
+  round String
+  scheduledAt DateTime
+  roomId String?
+  roomPassword String?
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+  results MatchResult[]
+  disputes Dispute[]
+}
+model MatchResult {
+  id String @id @default(cuid())
+  matchId String
+  teamId String
+  submittedById String
+  kills Int @default(0)
+  placement Int @default(0)
+  proofUrl String
+  status ResultStatus @default(SUBMITTED)
+  killPoints Int @default(0)
+  placementPoints Int @default(0)
+  totalPoints Int @default(0)
+  match Match @relation(fields: [matchId], references: [id])
+  submittedBy User @relation(fields: [submittedById], references: [id])
+  disputes Dispute[]
+  @@unique([matchId, teamId])
+}
+model Standing {
+  id String @id @default(cuid())
+  tournamentId String
+  teamId String
+  matchesPlayed Int @default(0)
+  kills Int @default(0)
+  totalPoints Int @default(0)
+  rank Int
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+  @@unique([tournamentId, teamId])
+}
+model Dispute {
+  id String @id @default(cuid())
+  matchId String
+  resultId String
+  openedById String
+  reason String
+  evidenceUrl String?
+  status DisputeStatus @default(OPEN)
+  match Match @relation(fields: [matchId], references: [id])
+  result MatchResult @relation(fields: [resultId], references: [id])
+  openedBy User @relation(fields: [openedById], references: [id])
+}
+model Referral {
+  id String @id @default(cuid())
+  referrerId String
+  refereeId String @unique
+  code String
+  rewarded Boolean @default(false)
+  referrer User @relation("referrer", fields: [referrerId], references: [id])
+  referee User @relation("referee", fields: [refereeId], references: [id])
+}
+model Notification {
+  id String @id @default(cuid())
+  userId String
+  title String
+  body String
+  readAt DateTime?
+  user User @relation(fields: [userId], references: [id])
+}
+model AuditLog {
+  id String @id @default(cuid())
+  actorId String
+  action String
+  entity String
+  entityId String?
+  metadata Json?
+  actor User @relation(fields: [actorId], references: [id])
+}

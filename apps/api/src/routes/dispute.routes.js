@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { roleGuard } from '../middleware/auth.js';
+import { logAction } from '../utils/auditLog.js';
+const router = Router();
+const disputeSchema = z.object({ matchId: z.string(), resultId: z.string(), reason: z.string().min(10), evidenceUrl: z.string().url().optional() });
+router.get('/', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => res.json(await req.app.locals.prisma.dispute.findMany({ orderBy: { status: 'asc' } })));
+router.post('/', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) => res.status(201).json(await req.app.locals.prisma.dispute.create({ data: { ...disputeSchema.parse(req.body), openedById: req.user.id } })));
+router.patch('/:id', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => { const data = z.object({ status: z.enum(['RESOLVED', 'REJECTED']), resolutionNote: z.string().min(3) }).parse(req.body); const prisma = req.app.locals.prisma; const dispute = await prisma.dispute.update({ where: { id: req.params.id }, data: { ...data, resolvedAt: new Date() } }); await logAction(prisma, { actorId: req.user.id, action: `DISPUTE_${data.status}`, entity: 'Dispute', entityId: dispute.id }); res.json(dispute); });
+export default router;

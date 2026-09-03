@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { moneyRouteGuard } from '../middleware/auth.js';
+import { logAction } from '../utils/auditLog.js';
+const router = Router();
+const amountSchema = z.object({ userId: z.string(), amount: z.number().positive() });
+router.use(moneyRouteGuard);
+router.post('/deposit', async (req, res) => { const input = amountSchema.parse(req.body); const prisma = req.app.locals.prisma; const wallet = await prisma.wallet.upsert({ where: { userId: input.userId }, update: { balance: { increment: input.amount } }, create: { userId: input.userId, balance: input.amount } }); const transaction = await prisma.transaction.create({ data: { userId: input.userId, walletId: wallet.id, amount: input.amount, type: 'DEPOSIT' } }); await logAction(prisma, { actorId: req.user.id, action: 'DEPOSIT', entity: 'Transaction', entityId: transaction.id }); res.status(201).json({ wallet, transaction, mockOnly: true }); });
+router.get('/:userId', async (req, res) => res.json(await req.app.locals.prisma.wallet.findUnique({ where: { userId: req.params.userId }, include: { transactions: true } })));
+export default router;

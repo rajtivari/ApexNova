@@ -1,0 +1,13 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { roleGuard } from '../middleware/auth.js';
+import { logAction } from '../utils/auditLog.js';
+import { recalculateStandings, scoreResult } from '../services/standings.service.js';
+const router = Router();
+const matchSchema = z.object({ tournamentId: z.string(), round: z.string().min(1), scheduledAt: z.coerce.date(), roomId: z.string().optional(), roomPassword: z.string().optional() });
+const resultSchema = z.object({ matchId: z.string(), teamId: z.string(), kills: z.number().int().nonnegative(), placement: z.number().int().positive(), proofUrl: z.string().url() });
+router.get('/', async (req, res) => res.json(await req.app.locals.prisma.match.findMany({ include: { results: true }, orderBy: { scheduledAt: 'asc' } })));
+router.post('/', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => { const data = matchSchema.parse(req.body); const match = await req.app.locals.prisma.match.create({ data }); await logAction(req.app.locals.prisma, { actorId: req.user.id, action: 'CREATE', entity: 'Match', entityId: match.id }); res.status(201).json(match); });
+router.post('/:id/results', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) => { const input = resultSchema.parse({ ...req.body, matchId: req.params.id }); const points = scoreResult(input); const result = await req.app.locals.prisma.matchResult.create({ data: { ...input, submittedById: req.user.id, ...points } }); res.status(201).json(result); });
+router.patch('/results/:resultId', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => { const data = z.object({ status: z.enum(['APPROVED', 'REJECTED']) }).parse(req.body); const prisma = req.app.locals.prisma; const result = await prisma.matchResult.update({ where: { id: req.params.resultId }, data: { status: data.status, reviewedAt: new Date() } }); if (data.status === 'APPROVED') { const match = await prisma.match.findUnique({ where: { id: result.matchId } }); await recalculateStandings(prisma, match.tournamentId); } await logAction(prisma, { actorId: req.user.id, action: `RESULT_${data.status}`, entity: 'MatchResult', entityId: result.id }); res.json(result); });
+export default router;

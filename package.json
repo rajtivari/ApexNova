@@ -1,0 +1,6 @@
+{
+  "name": "apexnova",
+  "private": true,
+  "scripts": {"dev": "concurrently \"npm --prefix apps/api run dev\" \"npm --prefix apps/web run dev\"", "build": "npm --prefix apps/web run build", "db:generate": "npm --prefix apps/api run prisma:generate"},
+  "devDependencies": {"concurrently": "^9.1.2"}
+}
