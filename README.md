@@ -67,5 +67,6 @@ Production API environment variables:
 - JWT_SECRET — unique secret with at least 32 characters.
 - CORS_ORIGINS — comma-separated list of exact allowed frontend origins.
 - NODE_ENV=production.
+- TRUST_PROXY=true when the API host sits behind a single trusted reverse proxy; otherwise leave it false. This keeps IP-based authentication rate limits meaningful.
 
 The API must be deployed and configured before login works on the public Pages site. GitHub Actions verifies the code and clean-database migrations, but it does not provision hosting or production secrets.
