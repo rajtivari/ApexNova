@@ -26,6 +26,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const app = express();
+app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : false);
 const prisma = new PrismaClient();
 app.locals.prisma = prisma;
 
