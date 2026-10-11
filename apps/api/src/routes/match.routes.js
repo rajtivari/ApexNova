@@ -6,30 +6,55 @@ import { recalculateStandings, scoreResult } from '../services/standings.service
 
 const router = Router();
 const matchSchema = z.object({
-  tournamentId: z.string(),
-  round: z.string().min(1),
+  tournamentId: z.string().min(1),
+  round: z.string().trim().min(1).max(80),
   scheduledAt: z.coerce.date(),
-  roomId: z.string().optional(),
-  roomPassword: z.string().optional(),
+  roomId: z.string().trim().max(120).optional(),
+  roomPassword: z.string().max(120).optional(),
 });
 const resultSchema = z.object({
-  matchId: z.string(),
-  teamId: z.string(),
-  kills: z.number().int().nonnegative(),
-  placement: z.number().int().positive(),
-  proofUrl: z.string().url(),
+  teamId: z.string().min(1),
+  kills: z.number().int().nonnegative().max(100),
+  placement: z.number().int().positive().max(100),
+  proofUrl: z.string().url().max(2048),
 });
 
 router.get('/', async (req, res) => {
   const matches = await req.app.locals.prisma.match.findMany({
-    include: { results: true },
+    select: {
+      id: true,
+      tournamentId: true,
+      round: true,
+      scheduledAt: true,
+      results: {
+        select: {
+          id: true,
+          teamId: true,
+          kills: true,
+          placement: true,
+          status: true,
+          killPoints: true,
+          placementPoints: true,
+          totalPoints: true,
+        },
+      },
+    },
     orderBy: { scheduledAt: 'asc' },
   });
-  res.json(matches);
+  return res.json(matches);
 });
 
 router.post('/', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => {
   const data = matchSchema.parse(req.body);
+  const tournament = await req.app.locals.prisma.tournament.findUnique({
+    where: { id: data.tournamentId },
+    select: { id: true, status: true },
+  });
+  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+  if (['COMPLETED', 'CANCELLED'].includes(tournament.status)) {
+    return res.status(409).json({ error: 'Cannot schedule a match for this tournament' });
+  }
+
   const match = await req.app.locals.prisma.match.create({ data });
   await logAction(req.app.locals.prisma, {
     actorId: req.user.id,
@@ -37,28 +62,107 @@ router.post('/', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => {
     entity: 'Match',
     entityId: match.id,
   });
-  res.status(201).json(match);
+  return res.status(201).json({
+    id: match.id,
+    tournamentId: match.tournamentId,
+    round: match.round,
+    scheduledAt: match.scheduledAt,
+  });
+});
+
+router.get('/:id/room', async (req, res) => {
+  const prisma = req.app.locals.prisma;
+  const match = await prisma.match.findUnique({
+    where: { id: req.params.id },
+    include: { tournament: { select: { status: true } } },
+  });
+  if (!match) return res.status(404).json({ error: 'Match not found' });
+
+  const isStaff = ['SUPER_ADMIN', 'WORKER'].includes(req.user.role);
+  if (!isStaff) {
+    const registration = await prisma.tournamentRegistration.findFirst({
+      where: {
+        tournamentId: match.tournamentId,
+        status: 'APPROVED',
+        team: {
+          OR: [
+            { captainId: req.user.id },
+            { members: { some: { userId: req.user.id } } },
+          ],
+        },
+      },
+      select: { id: true },
+    });
+    if (!registration) return res.status(403).json({ error: 'Approved team registration required' });
+    if (match.tournament.status !== 'LIVE') {
+      return res.status(409).json({ error: 'Room details are available only during live tournaments' });
+    }
+  }
+
+  return res.json({ id: match.id, roomId: match.roomId, roomPassword: match.roomPassword });
 });
 
 router.post('/:id/results', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) => {
-  const input = resultSchema.parse({ ...req.body, matchId: req.params.id });
-  const points = scoreResult(input);
-  const result = await req.app.locals.prisma.matchResult.create({
-    data: { ...input, submittedById: req.user.id, ...points },
+  const input = resultSchema.parse(req.body);
+  const prisma = req.app.locals.prisma;
+  const match = await prisma.match.findUnique({
+    where: { id: req.params.id },
+    select: { id: true, tournamentId: true, tournament: { select: { status: true } } },
   });
-  res.status(201).json(result);
+  if (!match) return res.status(404).json({ error: 'Match not found' });
+  if (['COMPLETED', 'CANCELLED'].includes(match.tournament.status)) {
+    return res.status(409).json({ error: 'Results cannot be submitted for this tournament' });
+  }
+
+  const registration = await prisma.tournamentRegistration.findFirst({
+    where: {
+      tournamentId: match.tournamentId,
+      teamId: input.teamId,
+      status: 'APPROVED',
+      team: {
+        OR: [
+          { captainId: req.user.id },
+          { members: { some: { userId: req.user.id } } },
+        ],
+      },
+    },
+    select: { id: true },
+  });
+  if (!registration) return res.status(403).json({ error: 'You must belong to an approved team in this tournament' });
+
+  const points = scoreResult(input);
+  const result = await prisma.matchResult.create({
+    data: { ...input, matchId: match.id, submittedById: req.user.id, ...points },
+  });
+  await logAction(prisma, {
+    actorId: req.user.id,
+    action: 'RESULT_SUBMITTED',
+    entity: 'MatchResult',
+    entityId: result.id,
+  });
+  return res.status(201).json(result);
 });
 
 router.patch('/results/:resultId', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => {
   const data = z.object({ status: z.enum(['APPROVED', 'REJECTED']) }).parse(req.body);
   const prisma = req.app.locals.prisma;
-  const result = await prisma.matchResult.update({
+  const existing = await prisma.matchResult.findUnique({
     where: { id: req.params.resultId },
-    data: { status: data.status },
+    select: { id: true, matchId: true },
   });
-  if (data.status === 'APPROVED') {
-    const match = await prisma.match.findUnique({ where: { id: result.matchId } });
-    if (!match) return res.status(404).json({ error: 'Match not found for result' });
+  if (!existing) return res.status(404).json({ error: 'Result not found' });
+
+  const result = await prisma.matchResult.update({
+    where: { id: existing.id },
+    data: { status: data.status, reviewedAt: new Date() },
+  });
+  const match = await prisma.match.findUnique({
+    where: { id: result.matchId },
+    select: { tournamentId: true },
+  });
+  if (match && data.status === 'APPROVED') {
+    await recalculateStandings(prisma, match.tournamentId);
+  } else if (match && data.status === 'REJECTED') {
     await recalculateStandings(prisma, match.tournamentId);
   }
   await logAction(prisma, {
@@ -67,7 +171,7 @@ router.patch('/results/:resultId', roleGuard('SUPER_ADMIN', 'WORKER'), async (re
     entity: 'MatchResult',
     entityId: result.id,
   });
-  res.json(result);
+  return res.json(result);
 });
 
 export default router;
