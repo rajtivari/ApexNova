@@ -54,20 +54,23 @@ router.post('/', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) => {
   });
   if (existingOpenDispute) return res.status(409).json({ error: 'This result already has an open dispute' });
 
-  const dispute = await prisma.dispute.create({
-    data: {
-      matchId: result.matchId,
-      resultId: result.id,
-      openedById: req.user.id,
-      reason: input.reason,
-      evidenceUrl: input.evidenceUrl,
-    },
-  });
-  await logAction(prisma, {
-    actorId: req.user.id,
-    action: 'DISPUTE_OPENED',
-    entity: 'Dispute',
-    entityId: dispute.id,
+  const dispute = await prisma.$transaction(async (tx) => {
+    const created = await tx.dispute.create({
+      data: {
+        matchId: result.matchId,
+        resultId: result.id,
+        openedById: req.user.id,
+        reason: input.reason,
+        evidenceUrl: input.evidenceUrl,
+      },
+    });
+    await logAction(tx, {
+      actorId: req.user.id,
+      action: 'DISPUTE_OPENED',
+      entity: 'Dispute',
+      entityId: created.id,
+    });
+    return created;
   });
   return res.status(201).json(dispute);
 });
@@ -85,20 +88,23 @@ router.patch('/:id', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Dispute not found' });
   if (existing.status !== 'OPEN') return res.status(409).json({ error: 'Dispute is already closed' });
 
-  const dispute = await prisma.dispute.update({
-    where: { id: existing.id },
-    data: {
-      status: input.status,
-      resolutionNote: input.resolutionNote ?? null,
-      resolvedAt: input.status === 'RESOLVED' ? new Date() : null,
-    },
-  });
-  await logAction(prisma, {
-    actorId: req.user.id,
-    action: `DISPUTE_${input.status}`,
-    entity: 'Dispute',
-    entityId: dispute.id,
-    metadata: { resolutionNote: input.resolutionNote ?? null },
+  const dispute = await prisma.$transaction(async (tx) => {
+    const updated = await tx.dispute.update({
+      where: { id: existing.id },
+      data: {
+        status: input.status,
+        resolutionNote: input.resolutionNote ?? null,
+        resolvedAt: input.status === 'RESOLVED' ? new Date() : null,
+      },
+    });
+    await logAction(tx, {
+      actorId: req.user.id,
+      action: 'DISPUTE_' + input.status,
+      entity: 'Dispute',
+      entityId: updated.id,
+      metadata: { resolutionNote: input.resolutionNote ?? null },
+    });
+    return updated;
   });
   return res.json(dispute);
 });
