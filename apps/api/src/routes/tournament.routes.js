@@ -64,12 +64,15 @@ router.get('/', async (req, res) => {
 
 router.post('/', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => {
   const data = tournamentSchema.parse(req.body);
-  const tournament = await req.app.locals.prisma.tournament.create({ data });
-  await logAction(req.app.locals.prisma, {
-    actorId: req.user.id,
-    action: 'CREATE',
-    entity: 'Tournament',
-    entityId: tournament.id,
+  const tournament = await req.app.locals.prisma.$transaction(async (tx) => {
+    const created = await tx.tournament.create({ data });
+    await logAction(tx, {
+      actorId: req.user.id,
+      action: 'CREATE',
+      entity: 'Tournament',
+      entityId: created.id,
+    });
+    return created;
   });
   return res.status(201).json(tournament);
 });
@@ -89,16 +92,19 @@ router.patch('/:id/status', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res)
     return res.status(409).json({ error: `Cannot change tournament from ${current.status} to ${input.status}` });
   }
 
-  const tournament = await prisma.tournament.update({
-    where: { id: current.id },
-    data: { status: input.status },
-  });
-  await logAction(prisma, {
-    actorId: req.user.id,
-    action: 'STATUS_CHANGE',
-    entity: 'Tournament',
-    entityId: tournament.id,
-    metadata: { from: current.status, to: input.status },
+  const tournament = await prisma.$transaction(async (tx) => {
+    const updated = await tx.tournament.update({
+      where: { id: current.id },
+      data: { status: input.status },
+    });
+    await logAction(tx, {
+      actorId: req.user.id,
+      action: 'STATUS_CHANGE',
+      entity: 'Tournament',
+      entityId: updated.id,
+      metadata: { from: current.status, to: input.status },
+    });
+    return updated;
   });
   return res.json(tournament);
 });
@@ -126,15 +132,18 @@ router.post('/:id/register', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) =>
   if (team.captainId !== req.user.id) return res.status(403).json({ error: 'Only the team captain can register the team' });
 
   try {
-    const registration = await prisma.tournamentRegistration.create({
-      data: { tournamentId: tournament.id, teamId: team.id, status: 'PENDING' },
-    });
-    await logAction(prisma, {
-      actorId: req.user.id,
-      action: 'TOURNAMENT_REGISTRATION_SUBMITTED',
-      entity: 'TournamentRegistration',
-      entityId: registration.id,
-      metadata: { tournamentId: tournament.id, teamId: team.id },
+    const registration = await prisma.$transaction(async (tx) => {
+      const created = await tx.tournamentRegistration.create({
+        data: { tournamentId: tournament.id, teamId: team.id, status: 'PENDING' },
+      });
+      await logAction(tx, {
+        actorId: req.user.id,
+        action: 'TOURNAMENT_REGISTRATION_SUBMITTED',
+        entity: 'TournamentRegistration',
+        entityId: created.id,
+        metadata: { tournamentId: tournament.id, teamId: team.id },
+      });
+      return created;
     });
     return res.status(201).json(registration);
   } catch (error) {
@@ -184,16 +193,19 @@ router.patch('/:id/registrations/:registrationId', roleGuard('SUPER_ADMIN', 'WOR
     return res.status(409).json({ error: 'Registration has already been reviewed' });
   }
 
-  const updated = await prisma.tournamentRegistration.update({
-    where: { id: registration.id },
-    data: { status: input.status },
-  });
-  await logAction(prisma, {
-    actorId: req.user.id,
-    action: `REGISTRATION_${input.status}`,
-    entity: 'TournamentRegistration',
-    entityId: updated.id,
-    metadata: { tournamentId: req.params.id },
+  const updated = await prisma.$transaction(async (tx) => {
+    const changed = await tx.tournamentRegistration.update({
+      where: { id: registration.id },
+      data: { status: input.status },
+    });
+    await logAction(tx, {
+      actorId: req.user.id,
+      action: 'REGISTRATION_' + input.status,
+      entity: 'TournamentRegistration',
+      entityId: changed.id,
+      metadata: { tournamentId: req.params.id },
+    });
+    return changed;
   });
   return res.json(updated);
 });
