@@ -35,6 +35,11 @@ const allowedOrigins = (process.env.CORS_ORIGINS || '')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+app.use((req, res, next) => {
+  console.log(`HTTP ${req.method} ${req.path} origin=${req.get('origin') || 'none'}`);
+  next();
+});
+
 app.use(helmet());
 app.use(cors({
   origin(origin, callback) {
@@ -42,6 +47,7 @@ app.use(cors({
     if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
+    console.warn(`CORS rejected origin: ${origin}`);
     return callback(new Error('Origin not allowed by CORS'));
   },
 }));
