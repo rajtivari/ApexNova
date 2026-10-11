@@ -35,6 +35,10 @@ export default function Home() {
   const [matches, setMatches] = useState([]);
   const [teams, setTeams] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [disputes, setDisputes] = useState([]);
+  const [disputeResultId, setDisputeResultId] = useState('');
+  const [disputeDraft, setDisputeDraft] = useState({ reason: '', evidenceUrl: '' });
+  const [resolutionNotes, setResolutionNotes] = useState({});
   const [teamName, setTeamName] = useState('');
   const [staffDraft, setStaffDraft] = useState({ email: '', displayName: '', password: '', role: 'WORKER' });
   const [memberEmails, setMemberEmails] = useState({});
@@ -49,7 +53,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  async function refreshWorkspace(sessionToken) {
+  async function refreshWorkspace(sessionToken, currentUser = user) {
     const activeToken = sessionToken || token;
     if (!activeToken) return;
     setRefreshing(true);
@@ -58,11 +62,13 @@ export default function Home() {
       apiRequest('/api/matches', { token: activeToken }),
       apiRequest('/api/teams', { token: activeToken }),
       apiRequest('/api/notifications', { token: activeToken }),
+      apiRequest(currentUser && ['SUPER_ADMIN', 'WORKER'].includes(currentUser.role) ? '/api/disputes' : '/api/disputes/mine', { token: activeToken }),
     ]);
     if (results[0].status === 'fulfilled') setTournaments(results[0].value);
     if (results[1].status === 'fulfilled') setMatches(results[1].value);
     if (results[2].status === 'fulfilled') setTeams(results[2].value);
     if (results[3].status === 'fulfilled') setNotifications(results[3].value);
+    if (results[4].status === 'fulfilled') setDisputes(results[4].value);
     const failed = results.find((item) => item.status === 'rejected');
     if (failed) {
       setNotice(failed.reason.message || 'Some data could not be loaded.');
@@ -80,7 +86,7 @@ export default function Home() {
       .then((response) => {
         setToken(storedToken);
         setUser(response.user);
-        return refreshWorkspace(storedToken);
+        return refreshWorkspace(storedToken, response.user);
       })
       .catch(() => {
         sessionStorage.removeItem('apexnova-access-token');
@@ -103,7 +109,7 @@ export default function Home() {
       setPassword('');
       setNotice(mode === 'register' ? 'Account created. Welcome to ApexNova.' : 'Signed in successfully.');
       setNoticeKind('success');
-      await refreshWorkspace(response.accessToken);
+      await refreshWorkspace(response.accessToken, response.user);
     } catch (error) {
       setNotice(error.message || 'Authentication failed.');
       setNoticeKind('error');
@@ -121,6 +127,7 @@ export default function Home() {
     setMatches([]);
     setTeams([]);
     setNotifications([]);
+    setDisputes([]);
     setActiveTab('overview');
     setNotice('Signed out.');
     setNoticeKind('info');
@@ -352,6 +359,48 @@ export default function Home() {
     }
   }
 
+
+  async function openDispute(event, matchId, resultId) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      await apiRequest('/api/disputes', {
+        token,
+        method: 'POST',
+        body: { matchId, resultId, reason: disputeDraft.reason, ...(disputeDraft.evidenceUrl ? { evidenceUrl: disputeDraft.evidenceUrl } : {}) },
+      });
+      setDisputeResultId('');
+      setDisputeDraft({ reason: '', evidenceUrl: '' });
+      setNotice('Dispute submitted for staff review.');
+      setNoticeKind('success');
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error.message);
+      setNoticeKind('error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resolveDispute(disputeId, status) {
+    setBusy(true);
+    try {
+      await apiRequest('/api/disputes/' + disputeId, {
+        token,
+        method: 'PATCH',
+        body: { status, resolutionNote: resolutionNotes[disputeId] || '' },
+      });
+      setNotice('Dispute ' + status.toLowerCase() + '.');
+      setNoticeKind('success');
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error.message);
+      setNoticeKind('error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function markRead(id) {
     try {
       await apiRequest('/api/notifications/' + id + '/read', { token, method: 'PATCH' });
@@ -364,7 +413,7 @@ export default function Home() {
 
   const isStaff = user && ['SUPER_ADMIN', 'WORKER'].includes(user.role);
   const myTeams = user ? teams.filter((team) => team.captainId === user.id || team.members?.some((member) => member.userId === user.id)) : [];
-  const visibleTabs = user?.role === 'SUPER_ADMIN' ? ['overview', 'tournaments', 'teams', 'matches', 'notifications', 'staff'] : ['overview', 'tournaments', 'teams', 'matches', 'notifications'];
+  const visibleTabs = user?.role === 'SUPER_ADMIN' ? ['overview', 'tournaments', 'teams', 'matches', 'disputes', 'notifications', 'staff'] : ['overview', 'tournaments', 'teams', 'matches', 'disputes', 'notifications'];
   const title = user && user.role === 'SUPER_ADMIN' ? 'Command center'
     : user && user.role === 'WORKER' ? 'Operations desk'
       : user && user.role === 'CAPTAIN' ? 'Team command' : 'Player dashboard';
