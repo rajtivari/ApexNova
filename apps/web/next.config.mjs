@@ -1,7 +1,8 @@
 const nextConfig = {
-	reactStrictMode: true,
-	output: 'export',
-	images: { unoptimized: true },
-	trailingSlash: true,
+  reactStrictMode: true,
+  output: 'export',
+  basePath: '/ApexNova',
+  images: { unoptimized: true },
+  trailingSlash: true,
 };
 export default nextConfig;

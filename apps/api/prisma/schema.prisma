@@ -64,8 +64,8 @@ model User {
   profile Profile?
   kyc Kyc?
   wallet Wallet?
-  captainedTeams Team[]
-  teams TeamMember[]
+  captainedTeam Team?
+  teamMembership TeamMember?
   results MatchResult[]
   disputes Dispute[]
   notifications Notification[]
@@ -102,24 +102,26 @@ model Transaction {
   type TransactionType
   amount Decimal
   status TransactionStatus @default(COMPLETED)
+  createdAt DateTime @default(now())
   wallet Wallet @relation(fields: [walletId], references: [id])
   user User @relation(fields: [userId], references: [id])
 }
 model Team {
   id String @id @default(cuid())
   name String
-  captainId String
+  captainId String @unique
   captain User @relation(fields: [captainId], references: [id])
   members TeamMember[]
   registrations TournamentRegistration[]
+  results MatchResult[]
+  standings Standing[]
 }
 model TeamMember {
   id String @id @default(cuid())
   teamId String
-  userId String
+  userId String @unique
   team Team @relation(fields: [teamId], references: [id])
   user User @relation(fields: [userId], references: [id])
-  @@unique([teamId, userId])
 }
 model Tournament {
   id String @id @default(cuid())
@@ -167,7 +169,9 @@ model MatchResult {
   killPoints Int @default(0)
   placementPoints Int @default(0)
   totalPoints Int @default(0)
+  reviewedAt DateTime?
   match Match @relation(fields: [matchId], references: [id])
+  team Team @relation(fields: [teamId], references: [id])
   submittedBy User @relation(fields: [submittedById], references: [id])
   disputes Dispute[]
   @@unique([matchId, teamId])
@@ -181,6 +185,7 @@ model Standing {
   totalPoints Int @default(0)
   rank Int
   tournament Tournament @relation(fields: [tournamentId], references: [id])
+  team Team @relation(fields: [teamId], references: [id])
   @@unique([tournamentId, teamId])
 }
 model Dispute {
@@ -191,6 +196,8 @@ model Dispute {
   reason String
   evidenceUrl String?
   status DisputeStatus @default(OPEN)
+  resolutionNote String?
+  resolvedAt DateTime?
   match Match @relation(fields: [matchId], references: [id])
   result MatchResult @relation(fields: [resultId], references: [id])
   openedBy User @relation(fields: [openedById], references: [id])
@@ -210,6 +217,7 @@ model Notification {
   title String
   body String
   readAt DateTime?
+  createdAt DateTime @default(now())
   user User @relation(fields: [userId], references: [id])
 }
 model AuditLog {

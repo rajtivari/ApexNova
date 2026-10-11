@@ -1,0 +1,9 @@
+ALTER TABLE "MatchResult"
+ADD COLUMN "reviewedAt" TIMESTAMP(3);
+
+ALTER TABLE "Dispute"
+ADD COLUMN "resolutionNote" TEXT,
+ADD COLUMN "resolvedAt" TIMESTAMP(3);
+
+ALTER TABLE "Notification"
+ADD COLUMN "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
