@@ -113,6 +113,8 @@ model Team {
   captain User @relation(fields: [captainId], references: [id])
   members TeamMember[]
   registrations TournamentRegistration[]
+  results MatchResult[]
+  standings Standing[]
 }
 model TeamMember {
   id String @id @default(cuid())
@@ -169,6 +171,7 @@ model MatchResult {
   totalPoints Int @default(0)
   reviewedAt DateTime?
   match Match @relation(fields: [matchId], references: [id])
+  team Team @relation(fields: [teamId], references: [id])
   submittedBy User @relation(fields: [submittedById], references: [id])
   disputes Dispute[]
   @@unique([matchId, teamId])
@@ -182,6 +185,7 @@ model Standing {
   totalPoints Int @default(0)
   rank Int
   tournament Tournament @relation(fields: [tournamentId], references: [id])
+  team Team @relation(fields: [teamId], references: [id])
   @@unique([tournamentId, teamId])
 }
 model Dispute {
