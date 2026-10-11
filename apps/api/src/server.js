@@ -94,6 +94,9 @@ app.use((error, req, res, next) => {
   if (error.message === 'Origin not allowed by CORS') {
     return res.status(403).json({ error: 'Origin not allowed' });
   }
+  if (error.code === 'P2002') return res.status(409).json({ error: 'A record with these values already exists' });
+  if (error.code === 'P2025') return res.status(404).json({ error: 'Requested record not found' });
+  if (error.code === 'P2003') return res.status(409).json({ error: 'A related record is invalid or in use' });
   console.error('API request failed:', error);
   return res.status(500).json({ error: 'Internal server error' });
 });
