@@ -80,6 +80,19 @@ test('registration creates a player account and login issues a valid session', a
   });
   assert.equal(protectedResponse.status, 200);
 
+
+  const staffEscalationResponse = await fetch(`${baseUrl}/api/auth/staff`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${login.accessToken}` },
+    body: JSON.stringify({
+      email: 'staff@example.com',
+      password: 'long-staff-password-123',
+      displayName: 'Attempted Staff',
+      role: 'WORKER',
+    }),
+  });
+  assert.equal(staffEscalationResponse.status, 403);
+
   const wrongPasswordResponse = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
