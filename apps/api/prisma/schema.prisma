@@ -64,8 +64,8 @@ model User {
   profile Profile?
   kyc Kyc?
   wallet Wallet?
-  captainedTeams Team[]
-  teams TeamMember[]
+  captainedTeam Team?
+  teamMembership TeamMember?
   results MatchResult[]
   disputes Dispute[]
   notifications Notification[]
