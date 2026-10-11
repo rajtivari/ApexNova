@@ -69,4 +69,4 @@ Production API environment variables:
 - NODE_ENV=production.
 - TRUST_PROXY=true when the API host sits behind a single trusted reverse proxy; otherwise leave it false. This keeps IP-based authentication rate limits meaningful.
 
-The API must be deployed and configured before login works on the public Pages site. GitHub Actions verifies the code and clean-database migrations, but it does not provision hosting or production secrets.
+The API must be deployed and configured before login works on the public Pages site. Build the API container with `docker build -t apexnova-api ./apps/api`; configure its production environment and run the Prisma migrations as a deployment step before serving traffic. GitHub Actions verifies the code, clean-database migrations, and production image build, but it does not provision hosting or production secrets.
