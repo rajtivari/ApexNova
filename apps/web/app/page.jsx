@@ -480,6 +480,19 @@ export default function Home() {
             <div className="sectionHeading"><div><p className="eyebrow">ACCOUNT ACTIVITY</p><h2>Notifications</h2></div><span className="mono">{notifications.length} ALERTS</span></div>
             <div className="dataList">{notifications.map((item) => <article className={'dataRow notificationRow ' + (item.readAt ? 'read' : 'unread')} key={item.id}><div className="notificationIcon"><Bell size={17} /><div><strong>{item.title}</strong><span>{item.body}</span><small>{formatDate(item.createdAt)}</small></div></div>{!item.readAt && <button className="textButton" onClick={() => markRead(item.id)}>MARK READ</button>}</article>)}{!notifications.length && <p className="emptyState">You are all caught up.</p>}</div>
           </section>}
+
+          {activeTab === 'staff' && user.role === 'SUPER_ADMIN' && <section className="workspace">
+            <div className="sectionHeading"><div><p className="eyebrow">ACCESS CONTROL</p><h2>Staff accounts</h2></div><span className="mono">SUPER ADMIN ONLY</span></div>
+            <form className="inlineForm compactForm" onSubmit={createStaff}>
+              <h3>Create a staff account</h3>
+              <p className="formHint">Only super admins can create worker or captain accounts. Credentials are not displayed again by this screen.</p>
+              <label>DISPLAY NAME<input value={staffDraft.displayName} onChange={(e) => setStaffDraft({ ...staffDraft, displayName: e.target.value })} minLength={2} maxLength={40} required /></label>
+              <label>EMAIL ADDRESS<input type="email" value={staffDraft.email} onChange={(e) => setStaffDraft({ ...staffDraft, email: e.target.value })} required /></label>
+              <label>TEMPORARY PASSWORD<input type="password" value={staffDraft.password} onChange={(e) => setStaffDraft({ ...staffDraft, password: e.target.value })} minLength={12} maxLength={128} required autoComplete="new-password" /></label>
+              <label>ROLE<select value={staffDraft.role} onChange={(e) => setStaffDraft({ ...staffDraft, role: e.target.value })}><option value="WORKER">Worker</option><option value="CAPTAIN">Captain</option></select></label>
+              <button className="primaryButton" type="submit" disabled={busy}>CREATE STAFF ACCOUNT <ChevronRight size={16} /></button>
+            </form>
+          </section>}
         </>
       )}
 
