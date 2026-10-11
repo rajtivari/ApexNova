@@ -36,6 +36,12 @@ export default function Home() {
   const [teams, setTeams] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [teamName, setTeamName] = useState('');
+  const [memberEmails, setMemberEmails] = useState({});
+  const [tournamentDraft, setTournamentDraft] = useState({ name: '', game: 'FREE_FIRE', format: 'BATTLE_ROYALE', entryFee: '0', prizePool: '0', startsAt: '', registrationClosesAt: '' });
+  const [matchDraft, setMatchDraft] = useState({ tournamentId: '', round: '1', scheduledAt: '', roomId: '', roomPassword: '' });
+  const [resultMatchId, setResultMatchId] = useState('');
+  const [resultDraft, setResultDraft] = useState({ teamId: '', kills: '0', placement: '1', proofUrl: '' });
+  const [roomDetails, setRoomDetails] = useState({});
   const [notice, setNotice] = useState('');
   const [noticeKind, setNoticeKind] = useState('info');
   const [busy, setBusy] = useState(false);
@@ -132,6 +138,156 @@ export default function Home() {
       setNoticeKind('error');
     } finally {
       setBusy(false);
+    }
+  }
+
+
+  async function addMember(event, teamId) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      await apiRequest('/api/teams/' + teamId + '/members', { token, method: 'POST', body: { email: memberEmails[teamId] || '' } });
+      setMemberEmails((current) => ({ ...current, [teamId]: '' }));
+      setNotice('Player added to roster.');
+      setNoticeKind('success');
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error.message);
+      setNoticeKind('error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createTournament(event) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      await apiRequest('/api/tournaments', {
+        token,
+        method: 'POST',
+        body: {
+          ...tournamentDraft,
+          entryFee: Number(tournamentDraft.entryFee),
+          prizePool: Number(tournamentDraft.prizePool),
+          startsAt: new Date(tournamentDraft.startsAt).toISOString(),
+          registrationClosesAt: new Date(tournamentDraft.registrationClosesAt).toISOString(),
+        },
+      });
+      setTournamentDraft({ name: '', game: 'FREE_FIRE', format: 'BATTLE_ROYALE', entryFee: '0', prizePool: '0', startsAt: '', registrationClosesAt: '' });
+      setNotice('Tournament created in draft status.');
+      setNoticeKind('success');
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error.message);
+      setNoticeKind('error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function changeTournamentStatus(tournament) {
+    const nextStatus = {
+      DRAFT: 'PUBLISHED',
+      PUBLISHED: 'REGISTRATION_OPEN',
+      REGISTRATION_OPEN: 'REGISTRATION_CLOSED',
+      REGISTRATION_CLOSED: 'LIVE',
+      LIVE: 'COMPLETED',
+    }[tournament.status];
+    if (!nextStatus) return;
+    setBusy(true);
+    try {
+      await apiRequest('/api/tournaments/' + tournament.id + '/status', { token, method: 'PATCH', body: { status: nextStatus } });
+      setNotice('Tournament moved to ' + nextStatus.replaceAll('_', ' ') + '.');
+      setNoticeKind('success');
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error.message);
+      setNoticeKind('error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function registerTeam(tournamentId) {
+    const team = teams.find((item) => item.captainId === user.id);
+    if (!team) {
+      setNotice('Create a team first. Only the captain can register it.');
+      setNoticeKind('error');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiRequest('/api/tournaments/' + tournamentId + '/register', { token, method: 'POST', body: { teamId: team.id } });
+      setNotice('Registration submitted for staff approval.');
+      setNoticeKind('success');
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error.message);
+      setNoticeKind('error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createMatch(event) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      await apiRequest('/api/matches', {
+        token,
+        method: 'POST',
+        body: {
+          tournamentId: matchDraft.tournamentId,
+          round: matchDraft.round,
+          scheduledAt: new Date(matchDraft.scheduledAt).toISOString(),
+          roomId: matchDraft.roomId || undefined,
+          roomPassword: matchDraft.roomPassword || undefined,
+        },
+      });
+      setMatchDraft({ tournamentId: '', round: '1', scheduledAt: '', roomId: '', roomPassword: '' });
+      setNotice('Match created.');
+      setNoticeKind('success');
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error.message);
+      setNoticeKind('error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitResult(event, matchId) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      await apiRequest('/api/matches/' + matchId + '/results', {
+        token,
+        method: 'POST',
+        body: { teamId: resultDraft.teamId, kills: Number(resultDraft.kills), placement: Number(resultDraft.placement), proofUrl: resultDraft.proofUrl },
+      });
+      setResultMatchId('');
+      setResultDraft({ teamId: '', kills: '0', placement: '1', proofUrl: '' });
+      setNotice('Result submitted for staff review.');
+      setNoticeKind('success');
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error.message);
+      setNoticeKind('error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadRoom(matchId) {
+    try {
+      const room = await apiRequest('/api/matches/' + matchId + '/room', { token });
+      setRoomDetails((current) => ({ ...current, [matchId]: room }));
+      setNotice('Room details loaded. Do not share them outside your registered squad.');
+      setNoticeKind('success');
+    } catch (error) {
+      setNotice(error.message);
+      setNoticeKind('error');
     }
   }
 
