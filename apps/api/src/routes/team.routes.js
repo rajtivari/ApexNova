@@ -52,7 +52,7 @@ router.post('/', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) => {
   return res.status(201).json(team);
 });
 
-router.post('/:teamId/members', roleGuard('CAPTAIN'), async (req, res) => {
+router.post('/:teamId/members', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) => {
   const input = memberSchema.parse(req.body);
   const prisma = req.app.locals.prisma;
   const team = await prisma.team.findUnique({
@@ -97,7 +97,7 @@ router.post('/:teamId/members', roleGuard('CAPTAIN'), async (req, res) => {
   return res.status(201).json(member);
 });
 
-router.delete('/:teamId/members/:userId', roleGuard('CAPTAIN'), async (req, res) => {
+router.delete('/:teamId/members/:userId', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) => {
   const prisma = req.app.locals.prisma;
   const team = await prisma.team.findUnique({
     where: { id: req.params.teamId },
