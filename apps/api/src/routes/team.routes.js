@@ -128,13 +128,15 @@ router.delete('/:teamId/members/:userId', roleGuard('CAPTAIN', 'PLAYER'), async 
     select: { id: true },
   });
   if (!member) return res.status(404).json({ error: 'Team member not found' });
-  await prisma.teamMember.delete({ where: { id: member.id } });
-  await logAction(prisma, {
-    actorId: req.user.id,
-    action: 'TEAM_MEMBER_REMOVED',
-    entity: 'TeamMember',
-    entityId: member.id,
-    metadata: { teamId: team.id, userId: req.params.userId },
+  await prisma.$transaction(async (tx) => {
+    await tx.teamMember.delete({ where: { id: member.id } });
+    await logAction(tx, {
+      actorId: req.user.id,
+      action: 'TEAM_MEMBER_REMOVED',
+      entity: 'TeamMember',
+      entityId: member.id,
+      metadata: { teamId: team.id, userId: req.params.userId },
+    });
   });
   return res.status(204).end();
 });
