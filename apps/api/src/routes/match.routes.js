@@ -55,12 +55,15 @@ router.post('/', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => {
     return res.status(409).json({ error: 'Cannot schedule a match for this tournament' });
   }
 
-  const match = await req.app.locals.prisma.match.create({ data });
-  await logAction(req.app.locals.prisma, {
-    actorId: req.user.id,
-    action: 'CREATE',
-    entity: 'Match',
-    entityId: match.id,
+  const match = await req.app.locals.prisma.$transaction(async (tx) => {
+    const created = await tx.match.create({ data });
+    await logAction(tx, {
+      actorId: req.user.id,
+      action: 'CREATE',
+      entity: 'Match',
+      entityId: created.id,
+    });
+    return created;
   });
   return res.status(201).json({
     id: match.id,
@@ -132,14 +135,17 @@ router.post('/:id/results', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) => 
 
   const points = scoreResult(input);
   try {
-    const result = await prisma.matchResult.create({
-      data: { ...input, matchId: match.id, submittedById: req.user.id, ...points },
-    });
-    await logAction(prisma, {
-      actorId: req.user.id,
-      action: 'RESULT_SUBMITTED',
-      entity: 'MatchResult',
-      entityId: result.id,
+    const result = await prisma.$transaction(async (tx) => {
+      const created = await tx.matchResult.create({
+        data: { ...input, matchId: match.id, submittedById: req.user.id, ...points },
+      });
+      await logAction(tx, {
+        actorId: req.user.id,
+        action: 'RESULT_SUBMITTED',
+        entity: 'MatchResult',
+        entityId: created.id,
+      });
+      return created;
     });
     return res.status(201).json(result);
   } catch (error) {
