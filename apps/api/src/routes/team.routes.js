@@ -5,7 +5,7 @@ import { logAction } from '../utils/auditLog.js';
 
 const router = Router();
 const teamSchema = z.object({ name: z.string().trim().min(2).max(40) });
-const memberSchema = z.object({ userId: z.string().min(1) });
+const memberSchema = z.object({ email: z.string().trim().email().transform((value) => value.toLowerCase()) });
 
 router.get('/', async (req, res) => {
   const prisma = req.app.locals.prisma;
@@ -64,7 +64,7 @@ router.post('/:teamId/members', roleGuard('CAPTAIN', 'PLAYER'), async (req, res)
   if (team.members.length >= 3) return res.status(409).json({ error: 'A squad can have a captain and up to three members' });
 
   const player = await prisma.user.findUnique({
-    where: { id: input.userId },
+    where: { email: input.email },
     select: { id: true, role: true },
   });
   if (!player || player.role !== 'PLAYER') return res.status(404).json({ error: 'Player account not found' });
