@@ -80,6 +80,7 @@ app.get('/api/docs', (_, res) => res.json({
     '/api/matches/{id}/results': { post: { summary: 'Submit result for an approved team' } },
     '/api/matches/{id}/room': { get: { summary: 'Read room credentials for an approved team during a live tournament' } },
     '/api/disputes': { get: { summary: 'List disputes (staff)' }, post: { summary: 'Open dispute' } },
+    '/api/disputes/mine': { get: { summary: 'List disputes opened by current user' } },
     '/api/notifications': { get: { summary: 'List current user notifications' } },
     '/api/wallet/{userId}': { get: { summary: 'Read wallet (super admin)' } },
   },
