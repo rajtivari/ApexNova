@@ -128,6 +128,10 @@ export default function Home() {
     setTeams([]);
     setNotifications([]);
     setDisputes([]);
+    setRoomDetails({});
+    setRegistrationsByTournament({});
+    setDisputeResultId('');
+    setResultMatchId('');
     setActiveTab('overview');
     setNotice('Signed out.');
     setNoticeKind('info');
