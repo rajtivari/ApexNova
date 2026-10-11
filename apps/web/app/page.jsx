@@ -63,6 +63,7 @@ function newId(prefix) { return prefix + '-' + Math.random().toString(36).slice(
 
 export default function Home() {
   const [data, setData] = useState(seed);
+  const [hydrated, setHydrated] = useState(false);
   const [active, setActive] = useState('overview');
   const [notice, setNotice] = useState({ type: '', text: '' });
   const [apiState, setApiState] = useState('checking');
@@ -83,6 +84,7 @@ export default function Home() {
       const saved = window.localStorage.getItem(STORAGE_KEY);
       if (saved) setData({ ...seed, ...JSON.parse(saved) });
     } catch {}
+    setHydrated(true);
     fetch(API_BASE_URL + '/api/health', { headers: { accept: 'application/json' } })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('API unavailable')))
       .then((health) => setApiState(health.status === 'ok' && health.database === 'connected' ? 'online' : 'degraded'))
@@ -90,8 +92,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
-  }, [data]);
+  }, [data, hydrated]);
 
   function flash(text, type = 'success') {
     setNotice({ text, type });
