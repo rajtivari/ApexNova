@@ -42,6 +42,7 @@ export default function Home() {
   const [resultMatchId, setResultMatchId] = useState('');
   const [resultDraft, setResultDraft] = useState({ teamId: '', kills: '0', placement: '1', proofUrl: '' });
   const [roomDetails, setRoomDetails] = useState({});
+  const [registrationsByTournament, setRegistrationsByTournament] = useState({});
   const [notice, setNotice] = useState('');
   const [noticeKind, setNoticeKind] = useState('info');
   const [busy, setBusy] = useState(false);
@@ -291,6 +292,48 @@ export default function Home() {
     }
   }
 
+
+  async function loadRegistrations(tournamentId) {
+    try {
+      const registrations = await apiRequest('/api/tournaments/' + tournamentId + '/registrations', { token });
+      setRegistrationsByTournament((current) => ({ ...current, [tournamentId]: registrations }));
+    } catch (error) {
+      setNotice(error.message);
+      setNoticeKind('error');
+    }
+  }
+
+  async function reviewRegistration(tournamentId, registrationId, status) {
+    setBusy(true);
+    try {
+      await apiRequest('/api/tournaments/' + tournamentId + '/registrations/' + registrationId, { token, method: 'PATCH', body: { status } });
+      setNotice('Registration ' + status.toLowerCase() + '.');
+      setNoticeKind('success');
+      await loadRegistrations(tournamentId);
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error.message);
+      setNoticeKind('error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reviewResult(resultId, status) {
+    setBusy(true);
+    try {
+      await apiRequest('/api/matches/results/' + resultId, { token, method: 'PATCH', body: { status } });
+      setNotice('Result ' + status.toLowerCase() + '.');
+      setNoticeKind('success');
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error.message);
+      setNoticeKind('error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function markRead(id) {
     try {
       await apiRequest('/api/notifications/' + id + '/read', { token, method: 'PATCH' });
@@ -302,6 +345,7 @@ export default function Home() {
   }
 
   const isStaff = user && ['SUPER_ADMIN', 'WORKER'].includes(user.role);
+  const myTeams = user ? teams.filter((team) => team.captainId === user.id || team.members?.some((member) => member.userId === user.id)) : [];
   const title = user && user.role === 'SUPER_ADMIN' ? 'Command center'
     : user && user.role === 'WORKER' ? 'Operations desk'
       : user && user.role === 'CAPTAIN' ? 'Team command' : 'Player dashboard';
