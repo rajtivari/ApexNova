@@ -86,3 +86,7 @@
 .registrationRow strong { font:600 18px 'Barlow Condensed',sans-serif; text-transform:uppercase; }
 .registrationRow span { color:#91a09f; font-size:11px; }
 .registrationRow .actionRow { margin-top:0; }
+
+.teamCaptain a { color:var(--cyan); overflow-wrap:anywhere; }
+.resultList > div { border-top:1px solid var(--line); }
+.resultList > div:first-child { border-top:0; }
