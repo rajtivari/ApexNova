@@ -71,20 +71,29 @@ router.post('/register', limitAuthAttempts, async (req, res) => {
   const passwordHash = await hashPassword(input.password);
 
   try {
-    const user = await prisma.user.create({
-      data: {
-        email: input.email,
-        passwordHash,
-        role: 'PLAYER',
-        profile: { create: { displayName: input.displayName } },
-        wallet: { create: {} },
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        profile: { select: { displayName: true } },
-      },
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email: input.email,
+          passwordHash,
+          role: 'PLAYER',
+          profile: { create: { displayName: input.displayName } },
+          wallet: { create: {} },
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          profile: { select: { displayName: true } },
+        },
+      });
+      await logAction(tx, {
+        actorId: created.id,
+        action: 'PLAYER_REGISTERED',
+        entity: 'User',
+        entityId: created.id,
+      });
+      return created;
     });
 
     const accessToken = issueToken(user);
