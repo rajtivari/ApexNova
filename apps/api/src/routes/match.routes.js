@@ -110,8 +110,8 @@ router.post('/:id/results', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) => 
     select: { id: true, tournamentId: true, tournament: { select: { status: true } } },
   });
   if (!match) return res.status(404).json({ error: 'Match not found' });
-  if (['COMPLETED', 'CANCELLED'].includes(match.tournament.status)) {
-    return res.status(409).json({ error: 'Results cannot be submitted for this tournament' });
+  if (match.tournament.status !== 'LIVE') {
+    return res.status(409).json({ error: 'Results can be submitted only while the tournament is live' });
   }
 
   const registration = await prisma.tournamentRegistration.findFirst({
@@ -131,20 +131,25 @@ router.post('/:id/results', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) => 
   if (!registration) return res.status(403).json({ error: 'You must belong to an approved team in this tournament' });
 
   const points = scoreResult(input);
-  const result = await prisma.matchResult.create({
-    data: { ...input, matchId: match.id, submittedById: req.user.id, ...points },
-  });
-  await logAction(prisma, {
-    actorId: req.user.id,
-    action: 'RESULT_SUBMITTED',
-    entity: 'MatchResult',
-    entityId: result.id,
-  });
-  return res.status(201).json(result);
+  try {
+    const result = await prisma.matchResult.create({
+      data: { ...input, matchId: match.id, submittedById: req.user.id, ...points },
+    });
+    await logAction(prisma, {
+      actorId: req.user.id,
+      action: 'RESULT_SUBMITTED',
+      entity: 'MatchResult',
+      entityId: result.id,
+    });
+    return res.status(201).json(result);
+  } catch (error) {
+    if (error?.code === 'P2002') return res.status(409).json({ error: 'A result for this team and match already exists' });
+    throw error;
+  }
 });
 
 router.patch('/results/:resultId', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => {
-  const data = z.object({ status: z.enum(['APPROVED', 'REJECTED']) }).parse(req.body);
+  const input = z.object({ status: z.enum(['APPROVED', 'REJECTED']) }).parse(req.body);
   const prisma = req.app.locals.prisma;
   const existing = await prisma.matchResult.findUnique({
     where: { id: req.params.resultId },
@@ -152,25 +157,25 @@ router.patch('/results/:resultId', roleGuard('SUPER_ADMIN', 'WORKER'), async (re
   });
   if (!existing) return res.status(404).json({ error: 'Result not found' });
 
-  const result = await prisma.matchResult.update({
-    where: { id: existing.id },
-    data: { status: data.status, reviewedAt: new Date() },
+  const result = await prisma.$transaction(async (tx) => {
+    const updated = await tx.matchResult.update({
+      where: { id: existing.id },
+      data: { status: input.status, reviewedAt: new Date() },
+    });
+    const match = await tx.match.findUnique({
+      where: { id: updated.matchId },
+      select: { tournamentId: true },
+    });
+    if (match) await recalculateStandings(tx, match.tournamentId);
+    await logAction(tx, {
+      actorId: req.user.id,
+      action: 'RESULT_' + input.status,
+      entity: 'MatchResult',
+      entityId: updated.id,
+    });
+    return updated;
   });
-  const match = await prisma.match.findUnique({
-    where: { id: result.matchId },
-    select: { tournamentId: true },
-  });
-  if (match && data.status === 'APPROVED') {
-    await recalculateStandings(prisma, match.tournamentId);
-  } else if (match && data.status === 'REJECTED') {
-    await recalculateStandings(prisma, match.tournamentId);
-  }
-  await logAction(prisma, {
-    actorId: req.user.id,
-    action: `RESULT_${data.status}`,
-    entity: 'MatchResult',
-    entityId: result.id,
-  });
+
   return res.json(result);
 });
 
