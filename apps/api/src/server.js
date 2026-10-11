@@ -62,11 +62,19 @@ app.get('/api/health', async (_, res) => {
   }
 });
 
-app.use('/api/tournaments', authenticate, tournamentRoutes);
+// Public read-only tournament list; all writes and sensitive routes still require authentication.
+app.use('/api/tournaments', (req, res, next) => {
+  if (req.method === 'GET' && req.path === '/') return next();
+  return authenticate(req, res, next);
+}, tournamentRoutes);
 app.use('/api/teams', authenticate, teamRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/matches', authenticate, matchRoutes);
+// Public read-only match/result list. Room details and all writes remain authenticated.
+app.use('/api/matches', (req, res, next) => {
+  if (req.method === 'GET' && req.path === '/') return next();
+  return authenticate(req, res, next);
+}, matchRoutes);
 app.use('/api/disputes', authenticate, disputeRoutes);
 app.use('/api/wallet', authenticate, walletRoutes);
 
