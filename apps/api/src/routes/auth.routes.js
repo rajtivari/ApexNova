@@ -5,6 +5,32 @@ import { authenticate } from '../middleware/auth.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 
 const router = Router();
+
+const authAttemptWindowMs = 15 * 60 * 1000;
+const authAttemptLimit = 20;
+const authAttempts = new Map();
+
+function limitAuthAttempts(req, res, next) {
+  const now = Date.now();
+  const key = req.ip || req.socket.remoteAddress || 'unknown';
+  let attempt = authAttempts.get(key);
+  if (!attempt || attempt.resetAt <= now) {
+    attempt = { count: 0, resetAt: now + authAttemptWindowMs };
+  }
+  if (attempt.count >= authAttemptLimit) {
+    return res.status(429).json({ error: 'Too many authentication attempts. Try again later.' });
+  }
+  attempt.count += 1;
+  authAttempts.set(key, attempt);
+
+  if (authAttempts.size > 5000) {
+    for (const [address, entry] of authAttempts) {
+      if (entry.resetAt <= now) authAttempts.delete(address);
+    }
+  }
+  return next();
+}
+
 const emailSchema = z.string().trim().email().max(254).transform((value) => value.toLowerCase());
 const registerSchema = z.object({
   email: emailSchema,
@@ -36,7 +62,7 @@ function publicUser(user) {
   return { id: user.id, email: user.email, role: user.role, profile: user.profile ?? null };
 }
 
-router.post('/register', async (req, res) => {
+router.post('/register', limitAuthAttempts, async (req, res) => {
   const input = registerSchema.parse(req.body);
   if (!getJwtSecret()) return res.status(503).json({ error: 'Authentication is not configured' });
 
@@ -71,7 +97,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', limitAuthAttempts, async (req, res) => {
   const input = loginSchema.parse(req.body);
   if (!getJwtSecret()) return res.status(503).json({ error: 'Authentication is not configured' });
 
