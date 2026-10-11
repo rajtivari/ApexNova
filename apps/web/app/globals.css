@@ -79,3 +79,10 @@
 .resultForm .primaryButton { grid-column:1/-1; }
 @media(max-width:800px) { .authLayout { grid-template-columns:1fr; gap:28px; padding:42px 0; min-height:0; } .authIntro h1 { font-size:clamp(60px,16vw,90px); } .authSignals { margin-top:24px; } .teamGrid { grid-template-columns:1fr; } .tournamentForm,.resultForm { grid-template-columns:1fr; } .tournamentForm h3,.tournamentForm .primaryButton,.resultForm .primaryButton { grid-column:auto; } }
 @media(max-width:520px) { .authCard { padding:22px 18px; } .dataRow { align-items:flex-start; flex-direction:column; } .rowMeta { align-items:flex-start; text-align:left; } .dataCard { padding:17px; } .dataCardHead { flex-direction:column; } .refreshButton { margin-left:0; } .roleTabs { flex-wrap:wrap; } .resultRow { justify-content:flex-start; } footer span:last-child { align-items:flex-start; } }
+
+.registrationList { display:flex; flex-direction:column; gap:10px; margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+.registrationRow { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:12px; background:#0f1518; }
+.registrationRow > div:first-child { display:flex; flex-direction:column; gap:5px; }
+.registrationRow strong { font:600 18px 'Barlow Condensed',sans-serif; text-transform:uppercase; }
+.registrationRow span { color:#91a09f; font-size:11px; }
+.registrationRow .actionRow { margin-top:0; }
