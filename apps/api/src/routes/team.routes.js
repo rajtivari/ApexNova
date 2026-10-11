@@ -40,16 +40,24 @@ router.post('/', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) => {
   });
   if (existingTeam) return res.status(409).json({ error: 'You already belong to a team' });
 
-  const team = await prisma.team.create({
-    data: { name: input.name, captainId: req.user.id },
-  });
-  await logAction(prisma, {
-    actorId: req.user.id,
-    action: 'TEAM_CREATED',
-    entity: 'Team',
-    entityId: team.id,
-  });
-  return res.status(201).json(team);
+  try {
+    const team = await prisma.$transaction(async (tx) => {
+      const created = await tx.team.create({
+        data: { name: input.name, captainId: req.user.id },
+      });
+      await logAction(tx, {
+        actorId: req.user.id,
+        action: 'TEAM_CREATED',
+        entity: 'Team',
+        entityId: created.id,
+      });
+      return created;
+    });
+    return res.status(201).json(team);
+  } catch (error) {
+    if (error?.code === 'P2002') return res.status(409).json({ error: 'You already captain a team' });
+    throw error;
+  }
 });
 
 router.post('/:teamId/members', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) => {
@@ -83,18 +91,26 @@ router.post('/:teamId/members', roleGuard('CAPTAIN', 'PLAYER'), async (req, res)
   });
   if (otherTeam) return res.status(409).json({ error: 'Player already belongs to a team' });
 
-  const member = await prisma.teamMember.create({
-    data: { teamId: team.id, userId: player.id },
-    include: { user: { select: { id: true, email: true, profile: { select: { displayName: true } } } } },
-  });
-  await logAction(prisma, {
-    actorId: req.user.id,
-    action: 'TEAM_MEMBER_ADDED',
-    entity: 'TeamMember',
-    entityId: member.id,
-    metadata: { teamId: team.id, userId: player.id },
-  });
-  return res.status(201).json(member);
+  try {
+    const member = await prisma.$transaction(async (tx) => {
+      const created = await tx.teamMember.create({
+        data: { teamId: team.id, userId: player.id },
+        include: { user: { select: { id: true, email: true, profile: { select: { displayName: true } } } } },
+      });
+      await logAction(tx, {
+        actorId: req.user.id,
+        action: 'TEAM_MEMBER_ADDED',
+        entity: 'TeamMember',
+        entityId: created.id,
+        metadata: { teamId: team.id, userId: player.id },
+      });
+      return created;
+    });
+    return res.status(201).json(member);
+  } catch (error) {
+    if (error?.code === 'P2002') return res.status(409).json({ error: 'Player already belongs to a team' });
+    throw error;
+  }
 });
 
 router.delete('/:teamId/members/:userId', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) => {
