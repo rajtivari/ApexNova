@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Activity, Bell, ChevronRight, Crosshair, LogOut, RefreshCw, Shield, Users, WalletCards, Trophy } from 'lucide-react';
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:4000' : '')).replace(/\/+$/, '');
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:4000' : 'https://apexnova-api.onrender.com')).replace(/\/+$/, '');
 
 async function apiRequest(path, options = {}) {
   if (!API_BASE_URL) throw new Error('API URL is not configured. Set NEXT_PUBLIC_API_URL when building the web app.');
