@@ -1,0 +1,51 @@
+name: Validate ApexNova API
+
+on:
+  push:
+    branches: [main, "fix/backend-foundation-audit"]
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/validate-api.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/validate-api.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/api/package-lock.json
+
+      - name: Install API dependencies
+        run: npm ci
+
+      - name: Check JavaScript syntax
+        working-directory: .
+        run: find apps/api/src -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+
+      - name: Validate Prisma schema
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/apexnova
+        run: npx prisma validate
+
+      - name: Generate Prisma client
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/apexnova
+        run: npm run prisma:generate
