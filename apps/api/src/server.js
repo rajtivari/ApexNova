@@ -70,6 +70,7 @@ app.get('/api/docs', (_, res) => res.json({
     '/api/health': { get: { summary: 'API and database health' } },
     '/api/auth/register': { post: { summary: 'Create a player account' } },
     '/api/auth/login': { post: { summary: 'Sign in' } },
+    '/api/auth/staff': { post: { summary: 'Create a worker or captain account (super admin only)' } },
     '/api/auth/me': { get: { summary: 'Get current account' } },
     '/api/tournaments': { get: { summary: 'List tournaments' }, post: { summary: 'Create tournament (staff)' } },
     '/api/tournaments/{id}/register': { post: { summary: 'Register a team for a free tournament' } },
