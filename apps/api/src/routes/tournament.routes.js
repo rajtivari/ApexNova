@@ -79,9 +79,12 @@ router.patch('/:id/status', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res)
   const prisma = req.app.locals.prisma;
   const current = await prisma.tournament.findUnique({
     where: { id: req.params.id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, registrationClosesAt: true },
   });
   if (!current) return res.status(404).json({ error: 'Tournament not found' });
+  if (input.status === 'REGISTRATION_OPEN' && current.registrationClosesAt <= new Date()) {
+    return res.status(409).json({ error: 'Cannot open registration after the registration deadline' });
+  }
   if (!allowedTransitions[current.status]?.includes(input.status)) {
     return res.status(409).json({ error: `Cannot change tournament from ${current.status} to ${input.status}` });
   }
