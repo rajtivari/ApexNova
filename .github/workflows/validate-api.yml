@@ -40,6 +40,9 @@ jobs:
         working-directory: .
         run: find apps/api/src -type f -name '*.js' -print0 | xargs -0 -n1 node --check
 
+      - name: Run unit tests
+        run: npm test
+
       - name: Validate Prisma schema
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/apexnova
