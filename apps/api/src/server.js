@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.routes.js';
 import matchRoutes from './routes/match.routes.js';
 import disputeRoutes from './routes/dispute.routes.js';
 import walletRoutes from './routes/wallet.routes.js';
+import teamRoutes from './routes/team.routes.js';
 import { authenticate } from './middleware/auth.js';
 
 if (process.env.NODE_ENV === 'production') {
@@ -55,6 +56,7 @@ app.get('/api/health', async (_, res) => {
 });
 
 app.use('/api/tournaments', authenticate, tournamentRoutes);
+app.use('/api/teams', authenticate, teamRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/matches', authenticate, matchRoutes);
@@ -70,7 +72,12 @@ app.get('/api/docs', (_, res) => res.json({
     '/api/auth/login': { post: { summary: 'Sign in' } },
     '/api/auth/me': { get: { summary: 'Get current account' } },
     '/api/tournaments': { get: { summary: 'List tournaments' }, post: { summary: 'Create tournament (staff)' } },
+    '/api/tournaments/{id}/register': { post: { summary: 'Register a team for a free tournament' } },
+    '/api/teams': { get: { summary: 'List teams visible to current user' }, post: { summary: 'Create a team' } },
+    '/api/teams/{teamId}/members': { post: { summary: 'Add a player to a roster' } },
     '/api/matches': { get: { summary: 'List matches' }, post: { summary: 'Create match (staff)' } },
+    '/api/matches/{id}/results': { post: { summary: 'Submit result for an approved team' } },
+    '/api/matches/{id}/room': { get: { summary: 'Read room credentials for an approved team during a live tournament' } },
     '/api/disputes': { get: { summary: 'List disputes (staff)' }, post: { summary: 'Open dispute' } },
     '/api/notifications': { get: { summary: 'List current user notifications' } },
     '/api/wallet/{userId}': { get: { summary: 'Read wallet (super admin)' } },
