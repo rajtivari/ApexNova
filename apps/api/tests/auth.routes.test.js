@@ -12,6 +12,7 @@ test('registration creates a player account and login issues a valid session', a
   let nextId = 1;
 
   const prisma = {
+    $transaction: async (callback) => callback({ user: prisma.user, auditLog: { create: async () => ({}) } }),
     user: {
       async create({ data }) {
         if (users.some((user) => user.email === data.email)) {
