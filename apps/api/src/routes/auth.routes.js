@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, roleGuard } from '../middleware/auth.js';
+import { logAction } from '../utils/auditLog.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 
 const router = Router();
@@ -119,6 +120,47 @@ router.post('/login', limitAuthAttempts, async (req, res) => {
   const accessToken = issueToken(user);
   if (!accessToken) return res.status(503).json({ error: 'Authentication is not configured' });
   return res.json({ user: publicUser(user), accessToken });
+});
+
+
+const staffAccountSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(12).max(128),
+  displayName: z.string().trim().min(2).max(40),
+  role: z.enum(['WORKER', 'CAPTAIN']),
+});
+
+router.post('/staff', authenticate, roleGuard('SUPER_ADMIN'), async (req, res) => {
+  const input = staffAccountSchema.parse(req.body);
+  if (!getJwtSecret()) return res.status(503).json({ error: 'Authentication is not configured' });
+
+  const prisma = req.app.locals.prisma;
+  try {
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email: input.email,
+          passwordHash: await hashPassword(input.password),
+          role: input.role,
+          profile: { create: { displayName: input.displayName } },
+          wallet: { create: {} },
+        },
+        select: { id: true, email: true, role: true, profile: { select: { displayName: true } } },
+      });
+      await logAction(tx, {
+        actorId: req.user.id,
+        action: 'STAFF_ACCOUNT_CREATED',
+        entity: 'User',
+        entityId: created.id,
+        metadata: { role: input.role },
+      });
+      return created;
+    });
+    return res.status(201).json({ user });
+  } catch (error) {
+    if (error?.code === 'P2002') return res.status(409).json({ error: 'An account with this email already exists' });
+    throw error;
+  }
 });
 
 router.get('/me', authenticate, async (req, res) => {
