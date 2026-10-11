@@ -36,6 +36,7 @@ export default function Home() {
   const [teams, setTeams] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [teamName, setTeamName] = useState('');
+  const [staffDraft, setStaffDraft] = useState({ email: '', displayName: '', password: '', role: 'WORKER' });
   const [memberEmails, setMemberEmails] = useState({});
   const [tournamentDraft, setTournamentDraft] = useState({ name: '', game: 'FREE_FIRE', format: 'BATTLE_ROYALE', entryFee: '0', prizePool: '0', startsAt: '', registrationClosesAt: '' });
   const [matchDraft, setMatchDraft] = useState({ tournamentId: '', round: '1', scheduledAt: '', roomId: '', roomPassword: '' });
@@ -334,6 +335,23 @@ export default function Home() {
     }
   }
 
+
+  async function createStaff(event) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const response = await apiRequest('/api/auth/staff', { token, method: 'POST', body: staffDraft });
+      setStaffDraft({ email: '', displayName: '', password: '', role: 'WORKER' });
+      setNotice('Staff account created for ' + response.user.email + '. Share credentials securely.');
+      setNoticeKind('success');
+    } catch (error) {
+      setNotice(error.message);
+      setNoticeKind('error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function markRead(id) {
     try {
       await apiRequest('/api/notifications/' + id + '/read', { token, method: 'PATCH' });
@@ -346,6 +364,7 @@ export default function Home() {
 
   const isStaff = user && ['SUPER_ADMIN', 'WORKER'].includes(user.role);
   const myTeams = user ? teams.filter((team) => team.captainId === user.id || team.members?.some((member) => member.userId === user.id)) : [];
+  const visibleTabs = user?.role === 'SUPER_ADMIN' ? ['overview', 'tournaments', 'teams', 'matches', 'notifications', 'staff'] : ['overview', 'tournaments', 'teams', 'matches', 'notifications'];
   const title = user && user.role === 'SUPER_ADMIN' ? 'Command center'
     : user && user.role === 'WORKER' ? 'Operations desk'
       : user && user.role === 'CAPTAIN' ? 'Team command' : 'Player dashboard';
@@ -383,7 +402,7 @@ export default function Home() {
         <>
           <section className="hero"><div><p className="eyebrow">APEXFLOW / OPERATIONS CONSOLE</p><h1>{title}</h1><p className="lede">Welcome, {user.profile?.displayName || user.email}. Your dashboard is connected to account-backed data.</p></div><div className="heroMark"><Shield size={42} /><span>{user.role.replace('_', ' ')}</span></div></section>
           <nav className="roleTabs" aria-label="Dashboard sections">
-            {['overview', 'tournaments', 'teams', 'matches', 'notifications'].map((tab) => <button key={tab} className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab.toUpperCase()}{tab === 'notifications' && notifications.filter((item) => !item.readAt).length ? ' (' + notifications.filter((item) => !item.readAt).length + ')' : ''}</button>)}
+            {visibleTabs.map((tab) => <button key={tab} className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab.toUpperCase()}{tab === 'notifications' && notifications.filter((item) => !item.readAt).length ? ' (' + notifications.filter((item) => !item.readAt).length + ')' : ''}</button>)}
             <button className="refreshButton" onClick={() => refreshWorkspace()} disabled={refreshing}><RefreshCw size={15} /> REFRESH</button>
           </nav>
           <section className="stats">
