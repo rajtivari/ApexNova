@@ -10,7 +10,6 @@ RUN npm run prisma:generate
 
 COPY src ./src
 COPY scripts ./scripts
-RUN npm prune --omit=dev
 
 FROM node:20-bookworm-slim AS runtime
 
