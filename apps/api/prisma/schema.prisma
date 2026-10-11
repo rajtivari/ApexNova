@@ -109,7 +109,7 @@ model Transaction {
 model Team {
   id String @id @default(cuid())
   name String
-  captainId String
+  captainId String @unique
   captain User @relation(fields: [captainId], references: [id])
   members TeamMember[]
   registrations TournamentRegistration[]
@@ -117,10 +117,9 @@ model Team {
 model TeamMember {
   id String @id @default(cuid())
   teamId String
-  userId String
+  userId String @unique
   team Team @relation(fields: [teamId], references: [id])
   user User @relation(fields: [userId], references: [id])
-  @@unique([teamId, userId])
 }
 model Tournament {
   id String @id @default(cuid())
