@@ -11,6 +11,17 @@ const disputeSchema = z.object({
   evidenceUrl: z.string().url().max(2048).optional(),
 });
 
+router.get('/mine', async (req, res) => {
+  const disputes = await req.app.locals.prisma.dispute.findMany({
+    where: { openedById: req.user.id },
+    include: {
+      result: { select: { teamId: true, kills: true, placement: true, status: true } },
+    },
+    orderBy: { status: 'asc' },
+  });
+  return res.json(disputes);
+});
+
 router.get('/', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => {
   const disputes = await req.app.locals.prisma.dispute.findMany({
     include: {
