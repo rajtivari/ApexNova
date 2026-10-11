@@ -67,3 +67,6 @@ jobs:
 
       - name: Apply migrations to clean PostgreSQL
         run: npx prisma migrate deploy
+
+      - name: Build production API image
+        run: docker build -t apexnova-api .
