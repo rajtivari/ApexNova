@@ -14,10 +14,13 @@ import { authenticate } from './middleware/auth.js';
 if (process.env.NODE_ENV === 'production') {
   const secret = process.env.JWT_SECRET;
   if (!secret || secret.length < 32 || secret === 'replace-me') {
-    throw new Error('Production requires a strong JWT_SECRET of at least 32 characters.');
+    throw new Error('Production requires a unique JWT_SECRET of at least 32 characters.');
   }
   if (!process.env.DATABASE_URL) {
     throw new Error('Production requires DATABASE_URL.');
+  }
+  if (!process.env.CORS_ORIGINS?.trim()) {
+    throw new Error('Production requires CORS_ORIGINS.');
   }
 }
 
@@ -82,7 +85,6 @@ app.use((error, req, res, next) => {
   if (error.message === 'Origin not allowed by CORS') {
     return res.status(403).json({ error: 'Origin not allowed' });
   }
-  // Do not expose database errors, tokens, or stack traces to clients.
   console.error('API request failed:', error);
   return res.status(500).json({ error: 'Internal server error' });
 });
