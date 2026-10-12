@@ -30,6 +30,9 @@ export default function AdminPage() {
   const [tournaments, setTournaments] = useState([]);
   const [teams, setTeams] = useState([]);
   const [matches, setMatches] = useState([]);
+  const [registrations, setRegistrations] = useState([]);
+  const [staffForm, setStaffForm] = useState({ displayName: '', email: '', password: '', role: 'WORKER' });
+  const [matchForm, setMatchForm] = useState({ tournamentId: '', round: 'Round 1', scheduledAt: '', roomId: '', roomPassword: '' });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -48,6 +51,13 @@ export default function AdminPage() {
       setTournaments(Array.isArray(events) ? events : []);
       setTeams(Array.isArray(roster) ? roster : []);
       setMatches(Array.isArray(games) ? games : []);
+      const registrationGroups = await Promise.all((Array.isArray(events) ? events : []).map(async (event) => {
+        try {
+          const rows = await api('/api/tournaments/' + event.id + '/registrations', current.accessToken);
+          return (Array.isArray(rows) ? rows : []).map((row) => ({ ...row, tournamentName: event.name, tournamentId: event.id }));
+        } catch { return []; }
+      }));
+      setRegistrations(registrationGroups.flat());
     } catch (err) { setError(err.message || 'Unable to load admin data.'); }
     finally { setLoading(false); }
   }, []);
@@ -86,6 +96,57 @@ export default function AdminPage() {
       setMessage(event.name + ' moved to ' + target.replaceAll('_', ' ') + '.');
       await load(session);
     } catch (err) { setError(err.message || 'Status update failed.'); }
+    finally { setBusy(false); }
+  }
+
+  async function createMatch(event) {
+    event.preventDefault(); setError(''); setMessage('');
+    if (!matchForm.tournamentId || !matchForm.scheduledAt || !matchForm.round.trim()) return setError('Choose a tournament, round, and schedule time.');
+    setBusy(true);
+    try {
+      await api('/api/matches', session.accessToken, { method: 'POST', body: JSON.stringify({
+        tournamentId: matchForm.tournamentId, round: matchForm.round.trim(),
+        scheduledAt: new Date(matchForm.scheduledAt).toISOString(),
+        ...(matchForm.roomId.trim() ? { roomId: matchForm.roomId.trim() } : {}),
+        ...(matchForm.roomPassword ? { roomPassword: matchForm.roomPassword } : {}),
+      }) });
+      setMessage('Match scheduled. Room details remain protected until the tournament is live.');
+      setMatchForm({ tournamentId: '', round: 'Round 1', scheduledAt: '', roomId: '', roomPassword: '' });
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not schedule match.'); }
+    finally { setBusy(false); }
+  }
+
+  async function reviewRegistration(row, status) {
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/tournaments/' + row.tournamentId + '/registrations/' + row.id, session.accessToken, { method: 'PATCH', body: JSON.stringify({ status }) });
+      setMessage('Registration ' + status.toLowerCase() + ' for ' + row.team?.name + '.');
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not review registration.'); }
+    finally { setBusy(false); }
+  }
+
+  async function reviewResult(result, status) {
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/matches/results/' + result.id, session.accessToken, { method: 'PATCH', body: JSON.stringify({ status }) });
+      setMessage('Match result ' + status.toLowerCase() + '. Standings were recalculated by the server.');
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not review result.'); }
+    finally { setBusy(false); }
+  }
+
+  async function createStaff(event) {
+    event.preventDefault(); setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/auth/staff', session.accessToken, { method: 'POST', body: JSON.stringify({
+        displayName: staffForm.displayName.trim(), email: staffForm.email.trim().toLowerCase(),
+        password: staffForm.password, role: staffForm.role,
+      }) });
+      setMessage('Staff account created. Share credentials securely with the assigned person.');
+      setStaffForm({ displayName: '', email: '', password: '', role: 'WORKER' });
+    } catch (err) { setError(err.message || 'Could not create staff account.'); }
     finally { setBusy(false); }
   }
 
@@ -139,6 +200,42 @@ export default function AdminPage() {
           </article>;
         })}</div>}
         <p className="playerPanelFoot"><ShieldCheck size={15}/> Every status transition is checked by the server and written to the audit log.</p>
+      </section>
+
+      <section className="playerPanel">
+        <div className="playerPanelHeading"><div><p className="eyebrow">SQUAD APPROVAL QUEUE</p><h2>TEAM <span className="ember">REGISTRATIONS.</span></h2></div><Users size={22}/></div>
+        {registrations.filter((row) => row.status === 'PENDING').length === 0 ? <div className="playerEmpty">NO PENDING REGISTRATIONS.</div> : <div className="adminTournamentList">{registrations.filter((row) => row.status === 'PENDING').map((row) => <article className="adminTournamentRow" key={row.id}><div className="adminTournamentIdentity"><span className="adminTournamentGlyph"><Users size={20}/></span><div><h3>{row.team?.name || 'Unknown squad'}</h3><p>{row.tournamentName} · Captain: {row.team?.captain?.profile?.displayName || row.team?.captain?.email || 'Unknown'}</p><small className="adminId">Registration {row.id}</small></div></div><div className="adminTournamentActions"><button className="secondaryButton" disabled={busy} onClick={() => reviewRegistration(row, 'APPROVED')}>APPROVE</button><button className="secondaryButton" disabled={busy} onClick={() => reviewRegistration(row, 'REJECTED')}>REJECT</button></div></article>)}</div>}
+      </section>
+
+      <section className="playerPanel">
+        <div className="playerPanelHeading"><div><p className="eyebrow">MATCH OPERATIONS</p><h2>SCHEDULE <span className="ember">MATCH.</span></h2></div><CalendarDays size={22}/></div>
+        <form className="adminTournamentForm" onSubmit={createMatch}>
+          <label className="adminField adminFieldWide">TOURNAMENT<select value={matchForm.tournamentId} onChange={(e) => setMatchForm({ ...matchForm, tournamentId: e.target.value })} required><option value="">Choose tournament</option>{tournaments.filter((event) => !['COMPLETED', 'CANCELLED'].includes(event.status)).map((event) => <option key={event.id} value={event.id}>{event.name} · {event.status}</option>)}</select></label>
+          <label className="adminField">ROUND / MATCH<input value={matchForm.round} onChange={(e) => setMatchForm({ ...matchForm, round: e.target.value })} maxLength={80} required /></label>
+          <label className="adminField">SCHEDULED AT<input type="datetime-local" value={matchForm.scheduledAt} onChange={(e) => setMatchForm({ ...matchForm, scheduledAt: e.target.value })} required /></label>
+          <label className="adminField">ROOM ID (OPTIONAL)<input value={matchForm.roomId} onChange={(e) => setMatchForm({ ...matchForm, roomId: e.target.value })} maxLength={120} /></label>
+          <label className="adminField">ROOM PASSWORD (OPTIONAL)<input value={matchForm.roomPassword} onChange={(e) => setMatchForm({ ...matchForm, roomPassword: e.target.value })} maxLength={120} /></label>
+          <div className="adminFormNote"><ShieldCheck size={16}/> Room credentials are returned only to approved teams while the tournament is live.</div>
+          <button className="primaryButton adminFormSubmit" type="submit" disabled={busy || !tournaments.length}>{busy ? 'SCHEDULING…' : 'SCHEDULE MATCH'} <ArrowRight size={16}/></button>
+        </form>
+        <div className="adminTournamentList">{matches.map((match) => <article className="adminTournamentRow" key={match.id}><div className="adminTournamentIdentity"><span className="adminTournamentGlyph"><Swords size={20}/></span><div><h3>{match.round}</h3><p>{tournaments.find((event) => event.id === match.tournamentId)?.name || 'Tournament'} · {new Date(match.scheduledAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>{(match.results || []).map((result) => <small key={result.id} className="adminId">Result: {result.status} · Placement {result.placement} · Kills {result.kills} · Points {result.totalPoints}</small>)}</div></div></article>)}</div>
+      </section>
+
+      <section className="playerPanel">
+        <div className="playerPanelHeading"><div><p className="eyebrow">RESULT MODERATION</p><h2>VERIFY <span className="ember">RESULTS.</span></h2></div><ShieldCheck size={22}/></div>
+        {matches.flatMap((match) => (match.results || []).filter((result) => result.status === 'PENDING').map((result) => ({ ...result, round: match.round }))).length === 0 ? <div className="playerEmpty">NO RESULTS WAITING FOR REVIEW.</div> : <div className="adminTournamentList">{matches.flatMap((match) => (match.results || []).filter((result) => result.status === 'PENDING').map((result) => ({ ...result, round: match.round }))).map((result) => <article className="adminTournamentRow" key={result.id}><div className="adminTournamentIdentity"><span className="adminTournamentGlyph"><Trophy size={20}/></span><div><h3>{result.round} · {result.placement}{result.placement === 1 ? 'st' : result.placement === 2 ? 'nd' : result.placement === 3 ? 'rd' : 'th'} place</h3><p>{result.kills} kills · {result.totalPoints} total points</p><small className="adminId">Result {result.id}</small></div></div><div className="adminTournamentActions"><button className="secondaryButton" disabled={busy} onClick={() => reviewResult(result, 'APPROVED')}>VERIFY</button><button className="secondaryButton" disabled={busy} onClick={() => reviewResult(result, 'REJECTED')}>REJECT</button></div></article>)}</div>}
+      </section>
+
+      <section className="playerPanel">
+        <div className="playerPanelHeading"><div><p className="eyebrow">STAFF ACCESS</p><h2>CREATE <span className="ember">STAFF ACCOUNT.</span></h2></div><ShieldCheck size={22}/></div>
+        <form className="adminTournamentForm" onSubmit={createStaff}>
+          <label className="adminField">DISPLAY NAME<input value={staffForm.displayName} onChange={(e) => setStaffForm({ ...staffForm, displayName: e.target.value })} minLength={2} maxLength={40} required /></label>
+          <label className="adminField">EMAIL<input type="email" value={staffForm.email} onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })} maxLength={254} required /></label>
+          <label className="adminField">TEMPORARY PASSWORD<input type="password" value={staffForm.password} onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })} minLength={12} maxLength={128} autoComplete="new-password" required /></label>
+          <label className="adminField">ROLE<select value={staffForm.role} onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value })}><option value="WORKER">TOURNAMENT WORKER</option><option value="CAPTAIN">CAPTAIN</option></select></label>
+          <div className="adminFormNote"><ShieldCheck size={16}/> Only the authenticated super-admin can create staff accounts. This does not grant super-admin privileges.</div>
+          <button className="primaryButton adminFormSubmit" type="submit" disabled={busy}>{busy ? 'CREATING ACCOUNT…' : 'CREATE ACCOUNT'} <ArrowRight size={16}/></button>
+        </form>
       </section>
       <footer className="playerFooter">APEX NOVA / ADMIN <span>{session.email} · Financial operations are intentionally disabled until verified payment and payout providers are configured.</span></footer>
     </main>
