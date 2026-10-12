@@ -29,7 +29,9 @@ export default function PlayerPage() {
   const [tournaments, setTournaments] = useState([]);
   const [teams, setTeams] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [matches, setMatches] = useState([]);
   const [teamName, setTeamName] = useState('');
+  const [memberEmail, setMemberEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -43,16 +45,18 @@ export default function PlayerPage() {
     setLoading(true);
     setError('');
     try {
-      const [me, events, roster, alerts] = await Promise.all([
+      const [me, events, roster, alerts, matchRows] = await Promise.all([
         api('/api/auth/me', currentSession.accessToken),
         api('/api/tournaments'),
         api('/api/teams', currentSession.accessToken),
         api('/api/notifications', currentSession.accessToken),
+        api('/api/matches'),
       ]);
       setProfile(me.user);
       setTournaments(Array.isArray(events) ? events : []);
       setTeams(Array.isArray(roster) ? roster : []);
       setNotifications(Array.isArray(alerts) ? alerts : []);
+      setMatches(Array.isArray(matchRows) ? matchRows : []);
     } catch (err) {
       setError(err.message || 'Could not load your player workspace.');
     } finally {
@@ -114,6 +118,38 @@ export default function PlayerPage() {
     }
   }
 
+  async function addMember(event) {
+    event.preventDefault();
+    if (!myTeam || myTeam.captain?.id !== profile?.id || !memberEmail.trim()) return;
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/teams/' + myTeam.id + '/members', session.accessToken, { method: 'POST', body: JSON.stringify({ email: memberEmail.trim().toLowerCase() }) });
+      setMemberEmail('');
+      setMessage('Player added to your squad.');
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not add player.'); }
+    finally { setBusy(false); }
+  }
+
+  async function removeMember(userId) {
+    if (!myTeam || !confirm('Remove this player from your squad?')) return;
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/teams/' + myTeam.id + '/members/' + userId, session.accessToken, { method: 'DELETE' });
+      setMessage('Player removed from your squad.');
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not remove player.'); }
+    finally { setBusy(false); }
+  }
+
+  async function markRead(item) {
+    if (item.readAt) return;
+    try {
+      await api('/api/notifications/' + item.id + '/read', session.accessToken, { method: 'PATCH' });
+      setNotifications((current) => current.map((row) => row.id === item.id ? { ...row, readAt: new Date().toISOString() } : row));
+    } catch (err) { setError(err.message || 'Could not mark notification as read.'); }
+  }
+
   function signOut() {
     window.localStorage.removeItem(SESSION_KEY);
     window.location.replace('/ApexNova/login/');
@@ -152,7 +188,7 @@ export default function PlayerPage() {
       <div className="playerColumns">
         <section className="playerPanel">
           <div className="playerPanelHeading"><div><p className="eyebrow">SQUAD OPERATIONS</p><h2>YOUR <span className="ember">SQUAD.</span></h2></div><Users size={22}/></div>
-          {myTeam ? <div className="playerTeamCard"><span className="playerTeamMark"><Users size={26}/></span><div><strong>{myTeam.name}</strong><p>{myTeam.captain?.profile?.displayName || myTeam.captain?.email || 'Squad captain'}</p><small>{(myTeam.members?.length || 0) + 1} / 4 PLAYERS · {myTeam.captain?.id === profile?.id ? 'YOU ARE CAPTAIN' : 'SQUAD MEMBER'}</small></div><span className="playerLiveTag">ACTIVE</span></div> : <form className="playerTeamForm" onSubmit={createTeam}><label htmlFor="teamName">CREATE YOUR SQUAD</label><p>Build a team before registering for captain-led tournaments.</p><input id="teamName" value={teamName} onChange={(event) => setTeamName(event.target.value)} minLength={2} maxLength={40} placeholder="Squad name" required/><button className="primaryButton" type="submit" disabled={busy}>{busy ? 'CREATING…' : 'CREATE SQUAD'} <ArrowRight size={15}/></button></form>}
+          {myTeam ? <div className="playerTeamCard"><span className="playerTeamMark"><Users size={26}/></span><div><strong>{myTeam.name}</strong><p>{myTeam.captain?.profile?.displayName || myTeam.captain?.email || 'Squad captain'}</p><small>{(myTeam.members?.length || 0) + 1} / 4 PLAYERS · {myTeam.captain?.id === profile?.id ? 'YOU ARE CAPTAIN' : 'SQUAD MEMBER'}</small></div><span className="playerLiveTag">ACTIVE</span></div>{myTeam.captain?.id === profile?.id && <><form className="playerTeamForm" onSubmit={addMember}><label>ADD PLAYER BY REGISTERED EMAIL</label><input type="email" value={memberEmail} onChange={(event) => setMemberEmail(event.target.value)} placeholder="teammate@example.com" required/><button className="primaryButton" type="submit" disabled={busy || (myTeam.members?.length || 0) >= 3}>{busy ? 'UPDATING…' : 'ADD TEAMMATE'} <ArrowRight size={15}/></button></form>{(myTeam.members || []).map((member) => <div className="playerProfileLine" key={member.userId}><span>{member.user?.profile?.displayName || member.user?.email || 'TEAMMATE'}</span><strong>{member.user?.email}<button className="secondaryButton" type="button" onClick={() => removeMember(member.userId)} disabled={busy}>REMOVE</button></strong></div>)}</>} : <form className="playerTeamForm" onSubmit={createTeam}><label htmlFor="teamName">CREATE YOUR SQUAD</label><p>Build a team before registering for captain-led tournaments.</p><input id="teamName" value={teamName} onChange={(event) => setTeamName(event.target.value)} minLength={2} maxLength={40} placeholder="Squad name" required/><button className="primaryButton" type="submit" disabled={busy}>{busy ? 'CREATING…' : 'CREATE SQUAD'} <ArrowRight size={15}/></button></form>}
           <div className="playerPanelFoot"><ShieldCheck size={15}/> Server-side account and squad permissions apply.</div>
         </section>
 
@@ -181,9 +217,14 @@ export default function PlayerPage() {
         <p className="playerPanelFoot"><CircleDollarSign size={15}/> Paid registration is deliberately blocked until a verified payment flow is deployed. No wallet balance is simulated here.</p>
       </section>
 
+      <section className="playerPanel playerEventsPanel">
+        <div className="playerPanelHeading"><div><p className="eyebrow">MATCH CENTER</p><h2>UPCOMING <span className="ember">MATCHES.</span></h2></div><Swords size={22}/></div>
+        {matches.length === 0 ? <div className="playerEmpty">NO MATCHES SCHEDULED YET.</div> : <div className="playerEventList">{matches.filter((match) => new Date(match.scheduledAt) >= new Date()).map((match) => <article className="playerEventRow" key={match.id}><div className="playerEventIcon"><CalendarDays size={20}/></div><div className="playerEventMain"><div className="playerEventMeta"><span>{tournaments.find((event) => event.id === match.tournamentId)?.name || 'APEX NOVA'}</span><span>SCHEDULED</span></div><h3>{match.round}</h3><p>{new Date(match.scheduledAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p></div><span className="playerEventStatus">ROOM DETAILS RELEASED IN LIVE MATCH</span></article>)}</div>}
+      </section>
+
       <section className="playerPanel">
         <div className="playerPanelHeading"><div><p className="eyebrow">PLAYER INBOX</p><h2>RECENT <span className="ember">UPDATES.</span></h2></div><Bell size={22}/></div>
-        {notifications.length === 0 ? <div className="playerEmpty">NO NOTIFICATIONS YET.</div> : notifications.slice(0, 5).map((item) => <article className="playerNotification" key={item.id}><span className={item.readAt ? 'notificationDot read' : 'notificationDot'}/><div><strong>{item.title}</strong><p>{item.body}</p><small>{new Date(item.createdAt).toLocaleString('en-IN')}</small></div></article>)}
+        {notifications.length === 0 ? <div className="playerEmpty">NO NOTIFICATIONS YET.</div> : notifications.slice(0, 5).map((item) => <article className="playerNotification" key={item.id}><span className={item.readAt ? 'notificationDot read' : 'notificationDot'}/><div><strong>{item.title}</strong><p>{item.body}</p><small>{new Date(item.createdAt).toLocaleString('en-IN')}</small></div>{!item.readAt && <button className="secondaryButton" onClick={() => markRead(item)}>MARK READ</button>}</article>)}
       </section>
       <footer className="playerFooter">APEX NOVA · RISE. DOMINATE. CONQUER. <span>Account and tournament data are API-backed. Payments remain disabled.</span></footer>
     </main>
