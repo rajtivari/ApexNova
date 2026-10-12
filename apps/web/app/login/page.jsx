@@ -2,14 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, ArrowRight, Crosshair, Eye, EyeOff, ShieldCheck, Trophy, UserRound, Zap } from 'lucide-react';
+import { ArrowRight, Crosshair, Eye, EyeOff, ShieldCheck, Trophy, Zap } from 'lucide-react';
 
-const DEMO_ACCOUNTS = {
-  admin: { email: 'tivariraj424@gmail.com', password: 'Admin@12345', displayName: 'ApexNova Admin', role: 'SUPER_ADMIN' },
-  player: { email: 'player@apexnova.demo', password: 'Player@12345', displayName: 'Demo Player', role: 'PLAYER' },
-};
-const USERS_KEY = 'apexnova-local-users-v1';
-const SESSION_KEY = 'apexnova-local-session-v1';
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://apexnova-api.onrender.com').replace(/\/$/, '');
+const SESSION_KEY = 'apexnova-session-v1';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,32 +15,35 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  function fillDemo(type) {
-    const account = DEMO_ACCOUNTS[type];
-    setEmail(account.email);
-    setPassword(account.password);
-    setError('');
-  }
-
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
     setBusy(true);
     setError('');
     try {
-      const seeded = Object.values(DEMO_ACCOUNTS);
-      let users = [];
-      try { users = JSON.parse(window.localStorage.getItem(USERS_KEY) || '[]'); } catch {}
-      const allUsers = [...seeded, ...users.filter((user) => !seeded.some((seed) => seed.email.toLowerCase() === user.email.toLowerCase()))];
-      const user = allUsers.find((item) => item.email.toLowerCase() === email.trim().toLowerCase() && item.password === password);
-      if (!user) {
-        setError('Those demo credentials do not match. Use one of the quick-fill buttons below.');
-        return;
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || (response.status >= 500
+          ? 'Sign-in service is unavailable. Please try again shortly.'
+          : 'Email or password is incorrect.'));
       }
-      const session = { email: user.email, displayName: user.displayName, role: user.role, signedInAt: new Date().toISOString() };
-      window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-      router.push(user.role === 'SUPER_ADMIN' ? '/admin' : '/player');
-    } catch {
-      setError('Local browser storage is unavailable. Please enable it and try again.');
+      if (!payload.accessToken || !payload.user?.role) {
+        throw new Error('The sign-in service returned an incomplete session. Please contact support.');
+      }
+      window.sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+        accessToken: payload.accessToken,
+        user: payload.user,
+        signedInAt: new Date().toISOString(),
+      }));
+      router.replace(payload.user.role === 'SUPER_ADMIN' ? '/admin' : '/player');
+    } catch (err) {
+      setError(err instanceof TypeError
+        ? 'Cannot reach the sign-in service. Check your connection or try again later.'
+        : (err.message || 'Unable to sign in right now.'));
     } finally {
       setBusy(false);
     }
@@ -53,43 +52,70 @@ export default function LoginPage() {
   return (
     <main className="shell authShell">
       <header className="topbar">
-        <div className="brand"><Crosshair size={22} /><span>APEX<span className="ember">NOVA</span></span></div>
-        <span className="status"><i className="pulse" /> LOCAL DEMO / NO API</span>
-        <button className="iconButton" onClick={() => router.push('/')} aria-label="Back to public board">×</button>
+        <button type="button" className="brand" onClick={() => router.push('/')} aria-label="APEX NOVA home">
+          <Crosshair size={24} /><span>APEX<span className="ember">NOVA</span></span>
+        </button>
+        <span className="status"><i className="pulse" /> ARENA ACCESS</span>
+        <button className="iconButton" onClick={() => router.push('/')} aria-label="Back to home">×</button>
       </header>
+
       <section className="authLayout">
         <div className="authIntro">
-          <p className="eyebrow">APEXNOVA / LOCAL TEST ENVIRONMENT</p>
+          <p className="eyebrow">APEX NOVA / PLAYER NETWORK</p>
           <h1>ENTER THE<br /><span className="ember">ARENA.</span></h1>
-          <p className="lede">Try both sides of the tournament platform. These demo accounts run entirely in this browser and do not call the API.</p>
+          <p className="lede">One account. Every match. Your path to the top starts here.</p>
           <div className="authSignals">
-            <div><ShieldCheck size={17} /> ROLE-BASED DEMO ROUTING</div>
-            <div><Trophy size={17} /> TOURNAMENT WORKSPACE</div>
-            <div><Zap size={17} /> LOCAL STORAGE ONLY</div>
+            <div><ShieldCheck size={17} /> SERVER-VERIFIED ACCESS</div>
+            <div><Trophy size={17} /> COMPETITIVE TOURNAMENTS</div>
+            <div><Zap size={17} /> LIVE ARENA UPDATES</div>
           </div>
         </div>
+
         <section className="authCard">
-          <div className="authStatus">● LOCAL AUTHENTICATION · NO SERVER REQUESTS</div>
-          <h2>ACCESS CONSOLE</h2>
-          <p className="formHint">Choose a demo account to fill the credentials, then press sign in.</p>
-          <div className="demoLoginButtons">
-            <button type="button" className="demoRoleButton" onClick={() => fillDemo('admin')}><ShieldCheck size={18} /><span><strong>ADMIN LOGIN</strong><small>Fill administrator credentials</small></span><ArrowRight size={15} /></button>
-            <button type="button" className="demoRoleButton" onClick={() => fillDemo('player')}><UserRound size={18} /><span><strong>PLAYER LOGIN</strong><small>Fill player credentials</small></span><ArrowRight size={15} /></button>
-          </div>
+          <div className="authStatus">● SECURE ACCOUNT SIGN-IN</div>
+          <h2>WELCOME BACK</h2>
+          <p className="formHint">Sign in to continue to APEX NOVA.</p>
+
           <form onSubmit={submit}>
-            <label>EMAIL ADDRESS<input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Choose admin or player above" required /></label>
-            <label>PASSWORD<span className="passwordField"><input type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} maxLength={128} placeholder="Demo password" required /><button type="button" className="passwordToggle" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></span></label>
-            {error && <p className="authMessage errorMessage" role="alert">{error}</p>}
-            <button className="primaryButton" type="submit" disabled={busy}>{busy ? 'OPENING WORKSPACE…' : 'SIGN IN TO DEMO'} <ArrowRight size={16} /></button>
+            <label>EMAIL ADDRESS
+              <input
+                type="email"
+                autoComplete="username"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+                maxLength={254}
+                required
+              />
+            </label>
+            <label>PASSWORD
+              <span className="passwordField">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  maxLength={128}
+                  placeholder="Enter your password"
+                  required
+                />
+                <button type="button" className="passwordToggle" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              </span>
+            </label>
+
+            {error && <div className="authError" role="alert">{error}</div>}
+
+            <button type="submit" className="primaryButton authSubmit" disabled={busy}>
+              {busy ? 'VERIFYING ACCESS…' : 'SIGN IN'} <ArrowRight size={17} />
+            </button>
           </form>
-          <div className="demoCredentials">
-            <p>ADMIN · <strong>tivariraj424@gmail.com</strong> / <code>Admin@12345</code></p>
-            <p>PLAYER · <strong>player@apexnova.demo</strong> / <code>Player@12345</code></p>
-          </div>
-          <p className="fieldNote warning">Demo only: credentials and role checks are stored in browser code, not secure authentication. Do not use real passwords or real payment details. Payments here are simulations only.</p>
+
+          <p className="authFooter">New to the arena? <button type="button" onClick={() => router.push('/register')}>Create account</button></p>
+          <p className="authLegal">18+ · Skill-based competition · Terms and eligibility apply</p>
         </section>
       </section>
-      <footer><span>APEXNOVA / LOCAL ACCOUNT GATE</span><span><Activity size={14} /> API DISCONNECTED BY DESIGN</span></footer>
     </main>
   );
 }
