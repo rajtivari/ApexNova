@@ -33,7 +33,7 @@ export default function RegisterPage() {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Could not create your account.');
-      router.replace('/login?registered=1');
+      window.location.assign('/ApexNova/login/?registered=1');
     } catch (err) {
       setError(err instanceof TypeError
         ? 'Cannot reach the account service. Please try again when the service is available.'
@@ -46,9 +46,9 @@ export default function RegisterPage() {
   return (
     <main className="shell authShell">
       <header className="topbar">
-        <button type="button" className="brand" onClick={() => router.push('/')} aria-label="APEX NOVA home"><Crosshair size={24} /><span>APEX<span className="ember">NOVA</span></span></button>
+        <button type="button" className="brand" onClick={() => window.location.assign('/ApexNova/')} aria-label="APEX NOVA home"><Crosshair size={24} /><span>APEX<span className="ember">NOVA</span></span></button>
         <span className="status"><i className="pulse" /> PLAYER REGISTRATION</span>
-        <button className="iconButton" onClick={() => router.push('/login')} aria-label="Back to sign in">×</button>
+        <button className="iconButton" onClick={() => window.location.assign('/ApexNova/login/')} aria-label="Back to sign in">×</button>
       </header>
       <section className="authLayout">
         <div className="authIntro">
