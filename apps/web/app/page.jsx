@@ -1,13 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownRight, ArrowRight, Bell, CalendarDays, ChevronDown, CircleDollarSign,
   Flame, Gamepad2, Gift, Menu, Search, ShieldCheck, Swords, Trophy, Users, X,
   Zap, Crosshair, Crown, Medal
 } from 'lucide-react';
 
-const tournaments = [
+const demoTournaments = [
   { id:'NOVA-041', title:'EMBER CLASH', game:'FREE FIRE', mode:'SQUAD · BATTLE ROYALE', entry:0, prize:5000, slots:48, filled:31, date:'18 OCT', time:'06:30 PM', status:'REGISTRATION OPEN', color:'ember', tag:'FREE ENTRY' },
   { id:'NOVA-042', title:'NIGHT OPS: BGMI', game:'BGMI', mode:'SQUAD · CLASSIC', entry:29, prize:8000, slots:64, filled:42, date:'19 OCT', time:'07:00 PM', status:'REGISTRATION OPEN', color:'cyan', tag:'MOST POPULAR' },
   { id:'NOVA-043', title:'RUSH HOUR #08', game:'FREE FIRE', mode:'SOLO · CLASH SQUAD', entry:10, prize:2500, slots:48, filled:44, date:'20 OCT', time:'05:00 PM', status:'FEW SLOTS LEFT', color:'olive', tag:'LAST 4 SLOTS' },
@@ -27,7 +27,32 @@ export default function Home() {
   const [game, setGame] = useState('ALL');
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const visible = useMemo(() => tournaments.filter(t => (game === 'ALL' || t.game === game) && (t.title + t.game + t.mode).toLowerCase().includes(query.toLowerCase())), [game, query]);
+  const [tournaments, setTournaments] = useState(demoTournaments);
+  const [tournamentSource, setTournamentSource] = useState('demo');
+  const [tournamentsLoading, setTournamentsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'https://apexnova-api.onrender.com').replace(/\/$/, '');
+    fetch(apiBase + '/api/tournaments', { headers: { Accept: 'application/json' } })
+      .then((response) => { if (!response.ok) throw new Error('Tournament service unavailable'); return response.json(); })
+      .then((items) => {
+        if (!active || !Array.isArray(items)) return;
+        const liveItems = items.map((item, index) => {
+          const start = new Date(item.startsAt);
+          const labels = { DRAFT: 'DRAFT', PUBLISHED: 'COMING SOON', REGISTRATION_OPEN: 'REGISTRATION OPEN', REGISTRATION_CLOSED: 'REGISTRATION CLOSED', LIVE: 'LIVE NOW', COMPLETED: 'COMPLETED', CANCELLED: 'CANCELLED' };
+          const gameName = item.game === 'FREE_FIRE' ? 'FREE FIRE' : item.game === 'BGMI' ? 'BGMI' : item.game;
+          return { id: String(item.id).slice(-8).toUpperCase(), title: item.name, game: gameName, mode: String(item.format || 'TOURNAMENT').replaceAll('_', ' '), entry: Number(item.entryFee || 0), prize: Number(item.prizePool || 0), slots: Math.max(Number(item.maxSlots || 48), Number(item._count?.registrations || 0), 1), filled: Number(item._count?.registrations || 0), date: Number.isNaN(start.getTime()) ? 'TBA' : start.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }).toUpperCase(), time: Number.isNaN(start.getTime()) ? 'TIME TBA' : start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }), status: labels[item.status] || String(item.status || 'SCHEDULED').replaceAll('_', ' '), color: index % 3 === 0 ? 'cyan' : index % 3 === 1 ? 'ember' : 'olive', tag: item.status === 'LIVE' ? 'LIVE NOW' : Number(item.entryFee || 0) === 0 ? 'FREE ENTRY' : 'OFFICIAL EVENT' };
+        });
+        setTournaments(liveItems);
+        setTournamentSource('live');
+      })
+      .catch(() => { if (active) { setTournaments(demoTournaments); setTournamentSource('demo'); } })
+      .finally(() => { if (active) setTournamentsLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const visible = useMemo(() => tournaments.filter(t => (game === 'ALL' || t.game === game) && (t.title + t.game + t.mode).toLowerCase().includes(query.toLowerCase())), [tournaments, game, query]);
 
   return (
     <main className="nova-site">
@@ -76,9 +101,10 @@ export default function Home() {
 
       <section className="tournament-section" id="tournaments">
         <div className="section-head"><div><div className="section-kicker"><span>03</span> FIND YOUR NEXT MATCH</div><h2>THE <span>LINEUP.</span></h2><p>Pick your game. Find your lobby. Make your mark.</p></div><a className="text-link" href="/ApexNova/login/">PLAYER HUB <ArrowRight size={16}/></a></div>
-        <div className="tournament-tools"><div className="game-filters"><button className={game==='ALL'?'filter-active':''} onClick={()=>setGame('ALL')}>ALL GAMES <span>04</span></button><button className={game==='FREE FIRE'?'filter-active':''} onClick={()=>setGame('FREE FIRE')}><span className="game-mini ff">FF</span> FREE FIRE</button><button className={game==='BGMI'?'filter-active':''} onClick={()=>setGame('BGMI')}><span className="game-mini bg">B</span> BGMI</button></div><label className="tournament-search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search tournaments..." aria-label="Search tournaments"/><span>/</span></label></div>
+        <div className="tournament-tools"><div className="game-filters"><button className={game==='ALL'?'filter-active':''} onClick={()=>setGame('ALL')}>ALL GAMES <span>{tournaments.length.toString().padStart(2, '0')}</span></button><button className={game==='FREE FIRE'?'filter-active':''} onClick={()=>setGame('FREE FIRE')}><span className="game-mini ff">FF</span> FREE FIRE</button><button className={game==='BGMI'?'filter-active':''} onClick={()=>setGame('BGMI')}><span className="game-mini bg">B</span> BGMI</button></div><label className="tournament-search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search tournaments..." aria-label="Search tournaments"/><span>/</span></label></div>
         <div className="tournament-grid">
-          {visible.map((t, i) => <article className={'tournament-card card-'+t.color} key={t.id}>
+          {tournamentsLoading && <div className="no-tournaments">SYNCING TOURNAMENT FEED…</div>}
+          {!tournamentsLoading && visible.map((t, i) => <article className={'tournament-card card-'+t.color} key={t.id}>
             <div className="card-art"><div className="card-art-lines"/><div className="card-game-stamp">{t.game==='BGMI'?'BATTLEGROUNDS':'FREE FIRE'}<span> // COMPETITIVE SERIES</span></div><div className="card-game-mark">{t.game==='BGMI'?'B':'FF'}</div><span className="card-number">0{i+1} / 04</span><span className="card-tag">{t.tag}</span></div>
             <div className="card-content"><div className="card-meta"><span>{t.id}</span><span className="card-live"><i className="live-dot"/>{t.status}</span></div><h3>{t.title}</h3><p className="card-mode"><Gamepad2 size={14}/>{t.mode}</p>
               <div className="card-prizes"><div><small>PRIZE POOL</small><strong>{money(t.prize)}</strong></div><div><small>ENTRY FEE</small><strong className={t.entry===0?'free-entry':''}>{t.entry===0?'FREE':money(t.entry)}</strong></div></div>
@@ -88,7 +114,7 @@ export default function Home() {
           </article>)}
           {visible.length===0 && <div className="no-tournaments">NO MATCHES FOUND. TRY ANOTHER GAME OR SEARCH.</div>}
         </div>
-        <p className="demo-disclaimer"><ShieldCheck size={14}/> Tournament cards are demo fixtures for the portfolio build. Registration and payments require a connected account and verified backend flow.</p>
+        <p className="demo-disclaimer"><ShieldCheck size={14}/> {tournamentSource === 'live' ? 'Tournament listings are loaded from the ApexNova API. Registration, paid entry, and payouts remain subject to verified backend and payment configuration.' : 'Showing showcase fixtures because the live tournament service could not be reached. These are not real events or prize offers.'}</p>
       </section>
 
       <section className="arena-band" id="how-it-works"><div className="band-graphic"><div className="band-cross">✳</div><span>READY<br/>CHECK</span><b>APX / 01</b></div><div className="band-copy"><div className="section-kicker"><span>04</span> NO COMPLICATED SETUP</div><h2>THREE STEPS.<br/><em>ALL GAME.</em></h2></div><div className="steps-list"><div><span>01</span><div><strong>CREATE YOUR PLAYER ID</strong><p>Set up your profile and choose your game.</p></div><ArrowRight size={16}/></div><div><span>02</span><div><strong>JOIN A TOURNAMENT</strong><p>Pick solo, duo, or squad events and register.</p></div><ArrowRight size={16}/></div><div><span>03</span><div><strong>PLAY. SUBMIT. CLIMB.</strong><p>Submit results, track standings, earn recognition.</p></div><ArrowRight size={16}/></div></div></section>
