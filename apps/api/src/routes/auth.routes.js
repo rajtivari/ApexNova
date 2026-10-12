@@ -126,6 +126,22 @@ router.post('/login', limitAuthAttempts, async (req, res) => {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
 
+  // An environment allowlist can further restrict privileged accounts. It never grants
+  // an admin role by email alone; the account must already be provisioned as SUPER_ADMIN.
+  const configuredAdminEmails = [
+    ...(process.env.ADMIN_EMAILS || '').split(','),
+    process.env.ADMIN_EMAIL || '',
+  ].map((value) => value.trim().toLowerCase()).filter(Boolean);
+  if (configuredAdminEmails.length > 0) {
+    const allowlisted = configuredAdminEmails.includes(user.email.toLowerCase());
+    if (user.role === 'SUPER_ADMIN' && !allowlisted) {
+      return res.status(403).json({ error: 'This administrator account is not in the configured admin allowlist' });
+    }
+    if (allowlisted && user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ error: 'Administrator access must be provisioned by the system owner' });
+    }
+  }
+
   const accessToken = issueToken(user);
   if (!accessToken) return res.status(503).json({ error: 'Authentication is not configured' });
   return res.json({ user: publicUser(user), accessToken });
