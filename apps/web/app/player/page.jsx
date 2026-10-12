@@ -1,61 +1,191 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Activity, ArrowDownToLine, ArrowRight, CircleDollarSign, Crosshair, LogOut, Plus, ShieldCheck, Wallet } from 'lucide-react';
+import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2, CircleDollarSign, Crosshair, Gamepad2, LogOut, RefreshCw, ShieldCheck, Swords, Users, Wallet } from 'lucide-react';
 
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://apexnova-api.onrender.com').replace(/\/$/, '');
 const SESSION_KEY = 'apexnova-local-session-v1';
-const PAYMENTS_KEY = 'apexnova-local-payments-v1';
 const money = (value) => '₹' + Number(value || 0).toLocaleString('en-IN');
+
+async function api(path, token, options = {}) {
+  const response = await fetch(API_BASE_URL + path, {
+    ...options,
+    headers: {
+      Accept: 'application/json',
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: 'Bearer ' + token } : {}),
+      ...(options.headers || {}),
+    },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || 'Request failed. Please try again.');
+  return payload;
+}
 
 export default function PlayerPage() {
   const [session, setSession] = useState(null);
-  const [payments, setPayments] = useState([]);
-  const [amount, setAmount] = useState('500');
-  const [reference, setReference] = useState('');
-  const [note, setNote] = useState('');
-  const [message, setMessage] = useState('');
+  const [profile, setProfile] = useState(null);
+  const [tournaments, setTournaments] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [teamName, setTeamName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [ready, setReady] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const load = useCallback(async (currentSession) => {
+    if (!currentSession?.accessToken) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const [me, events, roster, alerts] = await Promise.all([
+        api('/api/auth/me', currentSession.accessToken),
+        api('/api/tournaments'),
+        api('/api/teams', currentSession.accessToken),
+        api('/api/notifications', currentSession.accessToken),
+      ]);
+      setProfile(me.user);
+      setTournaments(Array.isArray(events) ? events : []);
+      setTeams(Array.isArray(roster) ? roster : []);
+      setNotifications(Array.isArray(alerts) ? alerts : []);
+    } catch (err) {
+      setError(err.message || 'Could not load your player workspace.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     try {
-      const current = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-      if (current?.role === 'PLAYER') setSession(current);
-      setPayments(JSON.parse(localStorage.getItem(PAYMENTS_KEY) || '[]'));
-    } catch {}
-    setReady(true);
-  }, []);
-  useEffect(() => { if (ready) localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments)); }, [payments, ready]);
+      const current = JSON.parse(window.localStorage.getItem(SESSION_KEY) || 'null');
+      if (current?.accessToken && current?.role && current.role !== 'SUPER_ADMIN') {
+        setSession(current);
+        load(current);
+      } else if (current?.accessToken && current.role === 'SUPER_ADMIN') {
+        window.location.replace('/ApexNova/admin/');
+      } else {
+        setLoading(false);
+      }
+    } catch {
+      setLoading(false);
+    }
+  }, [load]);
 
-  function submit(event) {
-    event.preventDefault(); setError(''); setMessage('');
-    const value = Number(amount);
-    if (!Number.isFinite(value) || value < 1 || value > 100000) return setError('Enter an amount between ₹1 and ₹1,00,000.');
-    const request = { id: 'PAY-' + Math.random().toString(36).slice(2, 8).toUpperCase(), amount: value, method: 'UPI MANUAL', reference: reference.trim(), note: note.trim(), playerEmail: session.email, status: 'PENDING', createdAt: new Date().toISOString() };
-    const next = [request, ...payments];
-    setPayments(next);
-    setReference(''); setNote('');
-    setMessage('Demo request created and marked PENDING. An admin can review it in this same browser.');
+  async function createTeam(event) {
+    event.preventDefault();
+    if (!teamName.trim() || !session?.accessToken) return;
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/teams', session.accessToken, { method: 'POST', body: JSON.stringify({ name: teamName.trim() }) });
+      setTeamName('');
+      setMessage('Squad created. Invite your teammates by their registered email from your team workspace.');
+      await load(session);
+    } catch (err) {
+      setError(err.message || 'Could not create squad.');
+    } finally {
+      setBusy(false);
+    }
   }
-  function signOut() { localStorage.removeItem(SESSION_KEY); window.location.href = '/ApexNova/login'; }
 
-  if (!ready) return <main className="shell"><p className="eyebrow">LOADING PLAYER WORKSPACE…</p></main>;
-  if (!session) return <main className="shell localAccessDenied"><Crosshair size={32} /><p className="eyebrow">PLAYER SESSION REQUIRED</p><h1>SIGN IN TO CONTINUE.</h1><p className="lede">Use the player quick-fill button on the local demo login page.</p><Link className="primaryButton" href="/login">GO TO DEMO LOGIN</Link></main>;
+  async function joinTournament(tournament) {
+    if (!session?.accessToken) return;
+    const team = teams.find((item) => item.captain?.id === profile?.id);
+    if (!team) {
+      setError('Create a squad first. Tournament registration is captain-led.');
+      return;
+    }
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/tournaments/' + tournament.id + '/register', session.accessToken, {
+        method: 'POST',
+        body: JSON.stringify({ teamId: team.id }),
+      });
+      setMessage('Registration submitted. Check the tournament status for staff approval.');
+      await load(session);
+    } catch (err) {
+      setError(err.message || 'Could not register this squad.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
-  const mine = payments.filter((item) => item.playerEmail === session.email);
-  const approved = mine.filter((item) => item.status === 'APPROVED').reduce((sum, item) => sum + item.amount, 0);
+  function signOut() {
+    window.localStorage.removeItem(SESSION_KEY);
+    window.location.replace('/ApexNova/login/');
+  }
+
+  if (loading && !session) return <main className="shell"><p className="eyebrow">CONNECTING TO PLAYER NETWORK…</p></main>;
+  if (!session) return <main className="shell localAccessDenied"><Crosshair size={32} /><p className="eyebrow">PLAYER ACCESS</p><h1>SIGN IN TO CONTINUE.</h1><p className="lede">Your player workspace uses the ApexNova API. Sign in to load your account, teams, and tournaments.</p><Link className="primaryButton" href="/login">SIGN IN <ArrowRight size={16}/></Link></main>;
+
+  const myTeam = teams.find((item) => item.captain?.id === profile?.id || item.members?.some((member) => member.userId === profile?.id));
+  const openEvents = tournaments.filter((item) => item.status === 'REGISTRATION_OPEN');
+  const upcoming = tournaments.filter((item) => !['COMPLETED', 'CANCELLED'].includes(item.status));
+
   return (
-    <main className="shell playerShell">
-      <header className="topbar"><Link href="/" className="brand adminBrand"><Crosshair size={22} /><span>APEX<span className="ember">NOVA</span></span></Link><span className="status"><i className="pulse" /> PLAYER / LOCAL DEMO</span><button className="secondaryButton adminSignOut" onClick={signOut}><LogOut size={14} /> SIGN OUT</button></header>
-      <section className="adminWelcome"><div><p className="eyebrow">PLAYER NETWORK / WALLET</p><h1>PLAYER <span className="ember">HUB.</span></h1><p className="lede">Welcome, {session.displayName || 'Player'}. Submit a simulated UPI top-up request and watch it move through manual admin review.</p></div><div className="adminSeal"><Wallet size={40} /><span>PLAYER</span><small>LOCAL SESSION</small></div></section>
-      <div className="adminStats playerStats"><article><span><CircleDollarSign size={15} /> REQUESTS</span><strong>{mine.length}</strong><small>Submitted by this demo player</small></article><article><span><Activity size={15} /> PENDING</span><strong>{mine.filter((item) => item.status === 'PENDING').length}</strong><small>Waiting for review</small></article><article><span><ShieldCheck size={15} /> APPROVED DEMO</span><strong>{money(approved)}</strong><small>Not real wallet funds</small></article></div>
-      <div className="playerGrid">
-        <form className="panel playerPaymentForm" onSubmit={submit}><p className="eyebrow">WALLET / MANUAL TOP-UP</p><h2>REQUEST A UPI TOP-UP</h2><p className="formHint">In a real version, this would show a verified merchant UPI QR and wait for admin proof review. This demo does not initiate or verify payments.</p><label>AMOUNT (₹)<input type="number" min="1" max="100000" value={amount} onChange={(event) => setAmount(event.target.value)} required /></label><label>DEMO UPI REFERENCE<input value={reference} onChange={(event) => setReference(event.target.value)} maxLength={80} placeholder="Optional sample reference (not verified)" /></label><label>NOTE FOR ADMIN<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={160} placeholder="Optional note" /></label>{error && <p className="authMessage errorMessage" role="alert">{error}</p>}{message && <p className="authMessage successMessage" role="status">{message}</p>}<button className="primaryButton" type="submit"><Plus size={16} /> SUBMIT DEMO REQUEST</button><p className="fieldNote warning">Do not send money or enter real bank credentials. An entered reference is not proof of payment.</p></form>
-        <section className="playerHistory"><div className="sectionHeading"><div><p className="eyebrow">WALLET LEDGER</p><h2>MY PAYMENT REQUESTS</h2></div><span className="mono">{mine.length} RECORDS</span></div>{mine.map((item) => <article className="panel playerRequest" key={item.id}><div className="playerRequestTop"><div><strong>{money(item.amount)}</strong><small>{item.id} · {new Date(item.createdAt).toLocaleString()}</small></div><span className={'statusTag status-' + item.status.toLowerCase()}>{item.status}</span></div><p>Method: {item.method}</p><small>Reference: {item.reference || 'Not provided'}</small>{item.reviewedAt && <p className="fieldNote">Reviewed {new Date(item.reviewedAt).toLocaleString()}.</p>}</article>)}{!mine.length && <div className="emptyPanel"><Wallet size={25} /><strong>No payment requests yet</strong><span>Submit a demo request to test the admin approval workflow.</span></div>}</section>
+    <main className="shell playerDashboard">
+      <header className="topbar">
+        <Link href="/" className="brand"><Crosshair size={24}/><span>APEX<span className="ember">NOVA</span></span></Link>
+        <span className="status"><i className="pulse"/> PLAYER NETWORK / LIVE DATA</span>
+        <button className="secondaryButton" onClick={signOut}><LogOut size={15}/> SIGN OUT</button>
+      </header>
+
+      <section className="playerWelcome">
+        <div><p className="eyebrow">PLAYER HUB / {profile?.role || session.role}</p><h1>WELCOME TO THE <span className="ember">ARENA.</span></h1><p className="lede">Your account and tournament data are loaded from the ApexNova API.</p></div>
+        <button className="secondaryButton" onClick={() => load(session)} disabled={busy || loading}><RefreshCw size={15}/> REFRESH DATA</button>
+      </section>
+
+      {error && <div className="playerNotice playerNoticeError" role="alert">{error}</div>}
+      {message && <div className="playerNotice playerNoticeSuccess" role="status"><CheckCircle2 size={17}/>{message}</div>}
+
+      <section className="playerMetricGrid">
+        <article className="playerMetric"><span><ShieldCheck size={18}/></span><small>ACCOUNT</small><strong>{profile?.role || session.role}</strong><p>{profile?.email || session.email}</p></article>
+        <article className="playerMetric"><span><Swords size={18}/></span><small>OPEN REGISTRATIONS</small><strong>{openEvents.length.toString().padStart(2, '0')}</strong><p>Events accepting squads</p></article>
+        <article className="playerMetric"><span><Gamepad2 size={18}/></span><small>AVAILABLE EVENTS</small><strong>{upcoming.length.toString().padStart(2, '0')}</strong><p>Not completed or cancelled</p></article>
+        <article className="playerMetric"><span><Bell size={18}/></span><small>NOTIFICATIONS</small><strong>{notifications.filter((item) => !item.readAt).length.toString().padStart(2, '0')}</strong><p>Unread updates</p></article>
+      </section>
+
+      <div className="playerColumns">
+        <section className="playerPanel">
+          <div className="playerPanelHeading"><div><p className="eyebrow">SQUAD OPERATIONS</p><h2>YOUR <span className="ember">SQUAD.</span></h2></div><Users size={22}/></div>
+          {myTeam ? <div className="playerTeamCard"><span className="playerTeamMark"><Users size={26}/></span><div><strong>{myTeam.name}</strong><p>{myTeam.captain?.profile?.displayName || myTeam.captain?.email || 'Squad captain'}</p><small>{(myTeam.members?.length || 0) + 1} / 4 PLAYERS · {myTeam.captain?.id === profile?.id ? 'YOU ARE CAPTAIN' : 'SQUAD MEMBER'}</small></div><span className="playerLiveTag">ACTIVE</span></div> : <form className="playerTeamForm" onSubmit={createTeam}><label htmlFor="teamName">CREATE YOUR SQUAD</label><p>Build a team before registering for captain-led tournaments.</p><input id="teamName" value={teamName} onChange={(event) => setTeamName(event.target.value)} minLength={2} maxLength={40} placeholder="Squad name" required/><button className="primaryButton" type="submit" disabled={busy}>{busy ? 'CREATING…' : 'CREATE SQUAD'} <ArrowRight size={15}/></button></form>}
+          <div className="playerPanelFoot"><ShieldCheck size={15}/> Server-side account and squad permissions apply.</div>
+        </section>
+
+        <section className="playerPanel">
+          <div className="playerPanelHeading"><div><p className="eyebrow">ACCOUNT STATUS</p><h2>YOUR <span className="ember">PROFILE.</span></h2></div><Activity size={22}/></div>
+          <div className="playerProfileLine"><span>PLAYER NAME</span><strong>{profile?.profile?.displayName || session.displayName || 'Player'}</strong></div>
+          <div className="playerProfileLine"><span>EMAIL</span><strong>{profile?.email || session.email}</strong></div>
+          <div className="playerProfileLine"><span>ACCESS ROLE</span><strong>{profile?.role || session.role}</strong></div>
+          <div className="playerProfileLine"><span>ACCOUNT ID</span><code>{profile?.id || session.userId || '—'}</code></div>
+          <div className="playerPanelFoot"><Wallet size={15}/> Real-money deposits and payouts are not enabled in this workspace.</div>
+        </section>
       </div>
-      <div className="adminInfo"><ShieldCheck size={18} /><div><strong>Local-only payment simulation</strong><p>The request is stored in this browser's localStorage. Open the admin panel in the same browser to approve or reject it. No Razorpay integration, QR payment, UPI verification, or real wallet credit is active.</p><Link href="/admin">OPEN ADMIN REVIEW <ArrowRight size={14} /></Link></div></div>
-      <footer><span>APEXNOVA / PLAYER WORKSPACE</span><span><Activity size={14} /> LOCAL STORAGE ONLY</span></footer>
+
+      <section className="playerPanel playerEventsPanel">
+        <div className="playerPanelHeading"><div><p className="eyebrow">LIVE API FEED</p><h2>TOURNAMENT <span className="ember">LINEUP.</span></h2></div><span className="playerLiveTag"><i className="pulse"/> API CONNECTED</span></div>
+        {loading ? <div className="playerEmpty">SYNCING TOURNAMENTS…</div> : tournaments.length === 0 ? <div className="playerEmpty">NO TOURNAMENTS PUBLISHED YET. CHECK BACK SOON.</div> : <div className="playerEventList">{tournaments.map((event) => {
+          const start = new Date(event.startsAt);
+          const canJoin = event.status === 'REGISTRATION_OPEN' && Number(event.entryFee || 0) === 0;
+          return <article className="playerEventRow" key={event.id}>
+            <div className="playerEventIcon"><Gamepad2 size={20}/></div>
+            <div className="playerEventMain"><div className="playerEventMeta"><span>{event.game === 'FREE_FIRE' ? 'FREE FIRE' : event.game}</span><span>{String(event.status).replaceAll('_', ' ')}</span></div><h3>{event.name}</h3><p><CalendarDays size={14}/>{Number.isNaN(start.getTime()) ? 'Time to be announced' : start.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })} <b>·</b> {String(event.format).replaceAll('_', ' ')}</p></div>
+            <div className="playerEventPrize"><small>PRIZE POOL</small><strong>{money(event.prizePool)}</strong><small>ENTRY {Number(event.entryFee || 0) === 0 ? 'FREE' : money(event.entryFee)}</small></div>
+            {canJoin ? <button className="secondaryButton playerJoinButton" onClick={() => joinTournament(event)} disabled={busy || !myTeam || myTeam.captain?.id !== profile?.id}>{myTeam?.captain?.id === profile?.id ? 'REGISTER SQUAD' : 'CAPTAIN ONLY'} <ArrowRight size={14}/></button> : <span className="playerEventStatus">{Number(event.entryFee || 0) > 0 ? 'PAID ENTRY DISABLED' : String(event.status).replaceAll('_', ' ')}</span>}
+          </article>;
+        })}</div>}
+        <p className="playerPanelFoot"><CircleDollarSign size={15}/> Paid registration is deliberately blocked until a verified payment flow is deployed. No wallet balance is simulated here.</p>
+      </section>
+
+      <section className="playerPanel">
+        <div className="playerPanelHeading"><div><p className="eyebrow">PLAYER INBOX</p><h2>RECENT <span className="ember">UPDATES.</span></h2></div><Bell size={22}/></div>
+        {notifications.length === 0 ? <div className="playerEmpty">NO NOTIFICATIONS YET.</div> : notifications.slice(0, 5).map((item) => <article className="playerNotification" key={item.id}><span className={item.readAt ? 'notificationDot read' : 'notificationDot'}/><div><strong>{item.title}</strong><p>{item.body}</p><small>{new Date(item.createdAt).toLocaleString('en-IN')}</small></div></article>)}
+      </section>
+      <footer className="playerFooter">APEX NOVA · RISE. DOMINATE. CONQUER. <span>Account and tournament data are API-backed. Payments remain disabled.</span></footer>
     </main>
   );
 }
