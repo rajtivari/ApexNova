@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Crosshair, Eye, EyeOff, ShieldCheck, Trophy, Zap } from 'lucide-react';
 
@@ -14,6 +14,19 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [serviceState, setServiceState] = useState('checking');
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('registered') === '1') setNotice('Account created successfully. Sign in with your new email and password.');
+    let active = true;
+    fetch(`${API_BASE_URL}/api/health`, { headers: { Accept: 'application/json' } })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('Service unavailable')))
+      .then((data) => { if (active) setServiceState(data.status === 'ok' ? 'online' : 'degraded'); })
+      .catch(() => { if (active) setServiceState('offline'); });
+    return () => { active = false; };
+  }, []);
 
   async function submit(event) {
     event.preventDefault();
@@ -43,7 +56,8 @@ export default function LoginPage() {
         signedInAt: new Date().toISOString(),
       };
       window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-      router.replace(session.role === 'SUPER_ADMIN' ? '/admin' : '/player');
+      // Use the full GitHub Pages base path explicitly so static hosting cannot drop it.
+      window.location.assign(session.role === 'SUPER_ADMIN' ? '/ApexNova/admin/' : '/ApexNova/player/');
     } catch (err) {
       setError(err instanceof TypeError
         ? 'Cannot reach the sign-in service. Check your connection or try again later.'
@@ -56,7 +70,7 @@ export default function LoginPage() {
   return (
     <main className="shell authShell">
       <header className="topbar">
-        <button type="button" className="brand" onClick={() => router.push('/')} aria-label="APEX NOVA home">
+        <button type="button" className="brand" onClick={() => window.location.assign('/ApexNova/')} aria-label="APEX NOVA home">
           <Crosshair size={24} /><span>APEX<span className="ember">NOVA</span></span>
         </button>
         <span className="status"><i className="pulse" /> ARENA ACCESS</span>
@@ -76,9 +90,11 @@ export default function LoginPage() {
         </div>
 
         <section className="authCard">
-          <div className="authStatus">● SECURE ACCOUNT SIGN-IN</div>
+          <div className="authStatus"><span className={'authServiceDot ' + serviceState} /> {serviceState === 'checking' ? 'CHECKING SIGN-IN SERVICE…' : serviceState === 'online' ? 'SIGN-IN SERVICE ONLINE' : serviceState === 'degraded' ? 'SIGN-IN SERVICE DEGRADED' : 'SIGN-IN SERVICE UNREACHABLE'}</div>
           <h2>WELCOME BACK</h2>
           <p className="formHint">Sign in to continue to APEX NOVA.</p>
+          {notice && <div className="authSuccess" role="status">{notice}</div>}
+          {serviceState === 'offline' && <div className="authError" role="status">The API could not be reached. The sign-in form is available, but login cannot complete until the backend is online.</div>}
 
           <form onSubmit={submit}>
             <label>EMAIL ADDRESS
@@ -99,7 +115,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="authFooter">New to the arena? <button type="button" onClick={() => router.push('/register')}>Create account</button></p>
+          <p className="authFooter">New to the arena? <button type="button" onClick={() => window.location.assign('/ApexNova/register/')}>Create account</button></p>
           <p className="authLegal">18+ · Skill-based competition · Terms and eligibility apply</p>
         </section>
       </section>
