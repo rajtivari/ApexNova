@@ -4,7 +4,7 @@ import RegisterSW from './register-sw';
 export const metadata = {
   title: 'APEX NOVA — Rise. Dominate. Conquer.',
   description: "India's competitive Free Fire and BGMI tournament arena. Rise. Dominate. Conquer.",
-  manifest: '/ApexNova/manifest.webmanifest',
+  manifest: '/ApexNova/manifest.json',
   icons: { icon: '/ApexNova/icon.svg' },
   themeColor: '#02020C',
   applicationName: 'APEX NOVA',
