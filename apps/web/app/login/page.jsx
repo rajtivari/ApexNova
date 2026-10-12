@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowRight, Crosshair, Eye, EyeOff, ShieldCheck, Trophy, Zap } from 'lucide-react';
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://apexnova-api.onrender.com').replace(/\/$/, '');
-const SESSION_KEY = 'apexnova-session-v1';
+const SESSION_KEY = 'apexnova-local-session-v1';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,12 +34,16 @@ export default function LoginPage() {
       if (!payload.accessToken || !payload.user?.role) {
         throw new Error('The sign-in service returned an incomplete session. Please contact support.');
       }
-      window.sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+      const session = {
+        email: payload.user.email,
+        displayName: payload.user.profile?.displayName || payload.user.email,
+        role: payload.user.role,
         accessToken: payload.accessToken,
-        user: payload.user,
+        userId: payload.user.id,
         signedInAt: new Date().toISOString(),
-      }));
-      router.replace(payload.user.role === 'SUPER_ADMIN' ? '/admin' : '/player');
+      };
+      window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      router.replace(session.role === 'SUPER_ADMIN' ? '/admin' : '/player');
     } catch (err) {
       setError(err instanceof TypeError
         ? 'Cannot reach the sign-in service. Check your connection or try again later.'
@@ -78,27 +82,11 @@ export default function LoginPage() {
 
           <form onSubmit={submit}>
             <label>EMAIL ADDRESS
-              <input
-                type="email"
-                autoComplete="username"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-                maxLength={254}
-                required
-              />
+              <input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" maxLength={254} required />
             </label>
             <label>PASSWORD
               <span className="passwordField">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  maxLength={128}
-                  placeholder="Enter your password"
-                  required
-                />
+                <input type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} maxLength={128} placeholder="Enter your password" required />
                 <button type="button" className="passwordToggle" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
                   {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
@@ -106,7 +94,6 @@ export default function LoginPage() {
             </label>
 
             {error && <div className="authError" role="alert">{error}</div>}
-
             <button type="submit" className="primaryButton authSubmit" disabled={busy}>
               {busy ? 'VERIFYING ACCESS…' : 'SIGN IN'} <ArrowRight size={17} />
             </button>
