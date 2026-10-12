@@ -372,3 +372,29 @@ body { background:#0b0e0c; }
 .accountDetails .roleValue { color:var(--cyan); }
 .fullButton { width:100%; margin-top:10px; }
 @media(max-width:700px) { .authLayout { grid-template-columns:1fr; gap:28px; padding:44px 0 35px; min-height:auto; } .authIntro h1 { font-size:64px; } .authSignals { gap:12px; font-size:9px; } .authCard { padding:22px; } }
+
+
+/* Custom 404 route recovery */
+.notFoundShell { display:flex; flex-direction:column; min-height:100vh; }
+.notFoundBrand { color:inherit; text-decoration:none; }
+.notFoundHomeIcon { display:inline-flex; align-items:center; justify-content:center; color:inherit; text-decoration:none; }
+.notFoundContent { flex:1; display:grid; grid-template-columns:minmax(260px,.95fr) minmax(320px,1fr); align-items:center; gap:clamp(28px,7vw,100px); padding:clamp(48px,8vw,100px) 0; }
+.notFoundGraphic { position:relative; display:grid; place-items:center; min-height:340px; overflow:hidden; border:1px solid var(--line); background:linear-gradient(145deg,rgba(26,39,41,.72),rgba(13,19,22,.45)); isolation:isolate; }
+.notFoundGraphic:before,.notFoundGraphic:after { content:""; position:absolute; background:var(--line); opacity:.55; }
+.notFoundGraphic:before { width:100%; height:1px; top:50%; }
+.notFoundGraphic:after { width:1px; height:100%; left:50%; }
+.notFoundRing { position:absolute; display:block; border:1px solid rgba(97,216,209,.24); border-radius:50%; aspect-ratio:1; }
+.ringOne { width:min(74%,280px); }
+.ringTwo { width:min(52%,196px); border-style:dashed; border-color:rgba(255,90,54,.5); }
+.notFoundCrosshair { position:absolute; z-index:1; display:grid; place-items:center; width:94px; height:94px; color:var(--cyan); background:#11191c; border:1px solid var(--cyan); box-shadow:0 0 45px rgba(97,216,209,.12); }
+.notFoundCode { position:absolute; z-index:2; right:7%; bottom:8%; color:var(--ember); font:800 clamp(42px,6vw,76px)/.8 'Barlow Condensed',sans-serif; letter-spacing:-2px; opacity:.95; }
+.notFoundCoordinate { position:absolute; z-index:2; left:7%; top:7%; color:#879493; font:10px 'DM Mono',monospace; letter-spacing:1px; }
+.notFoundCopy .eyebrow { display:flex; align-items:center; gap:8px; }
+.notFoundCopy h1 { font:800 clamp(52px,7vw,92px)/.84 'Barlow Condensed',sans-serif; text-transform:uppercase; letter-spacing:-1px; margin:0; }
+.notFoundActions { display:flex; flex-wrap:wrap; gap:10px; margin-top:26px; }
+.notFoundPrimary { width:auto; text-decoration:none; margin:0; }
+.notFoundActions .secondaryButton { text-decoration:none; }
+.notFoundMeta { display:flex; align-items:center; gap:9px; margin-top:30px; color:#7e908e; font:10px 'DM Mono',monospace; letter-spacing:.5px; }
+.notFoundMeta svg { color:var(--cyan); }
+.notFoundMetaDivider { color:var(--ember); }
+@media(max-width:760px) { .notFoundContent { grid-template-columns:1fr; padding:36px 0; gap:28px; } .notFoundGraphic { min-height:230px; } .notFoundCopy h1 { font-size:clamp(50px,13vw,76px); } .notFoundActions { flex-direction:column; align-items:stretch; } .notFoundPrimary,.notFoundActions .secondaryButton { width:100%; min-height:44px; } }
