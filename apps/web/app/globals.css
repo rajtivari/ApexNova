@@ -590,3 +590,36 @@ body { background:#0b0e0c; }
  .playerFooter { flex-direction:column; }
  .playerFooter span { text-align:left; }
 }
+
+
+/* Admin tournament operations */
+.adminTournamentForm { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; padding-top:18px; }
+.adminField { display:grid; gap:7px; color:#6060A0; font:10px 'Share Tech Mono',monospace; letter-spacing:.06em; }
+.adminFieldWide { grid-column:1/-1; }
+.adminField input,.adminField select { width:100%; min-height:44px; padding:10px 12px; color:#E8E8FF; background:#050510; border:1px solid #252560; border-radius:0; font:13px 'Exo 2',sans-serif; outline:none; }
+.adminField input:focus,.adminField select:focus { border-color:#00D4FF; box-shadow:0 0 0 2px #00D4FF1c; }
+.adminField select { appearance:auto; }
+.adminFormNote { display:flex; align-items:center; gap:8px; grid-column:1/-1; padding:11px 12px; color:#FFB65C; background:#FF8C000b; border:1px solid #FF8C0033; font-size:12px; }
+.adminFormSubmit { display:flex; justify-content:center; align-items:center; gap:8px; grid-column:1/-1; min-height:46px; cursor:pointer; }
+.adminFormSubmit:disabled { opacity:.55; cursor:wait; }
+.adminTournamentList { display:grid; }
+.adminTournamentRow { display:flex; justify-content:space-between; align-items:center; gap:20px; padding:18px 0; border-bottom:1px solid #16163A; }
+.adminTournamentIdentity { display:flex; align-items:center; gap:14px; min-width:0; }
+.adminTournamentGlyph { display:grid; place-items:center; flex:0 0 auto; width:44px; height:44px; color:#00D4FF; border:1px solid #00D4FF40; background:#00D4FF0c; }
+.adminTournamentIdentity>div { min-width:0; }
+.adminTournamentIdentity h3 { margin:5px 0; color:#E8E8FF; font:800 1.55rem 'Barlow Condensed',sans-serif; text-transform:uppercase; letter-spacing:.035em; }
+.adminTournamentIdentity p { margin:0 0 4px; color:#8989B8; font-size:12px; }
+.adminId { color:#45457D; font:10px 'Share Tech Mono',monospace; overflow-wrap:anywhere; }
+.adminTournamentActions { display:flex; align-items:flex-end; flex-direction:column; gap:9px; flex:0 0 auto; }
+.adminTournamentActions .secondaryButton { display:flex; align-items:center; gap:7px; min-height:34px; font-size:10px; cursor:pointer; }
+.adminStatusPill { padding:6px 8px; color:#FFB65C; border:1px solid #FF8C0038; background:#FF8C000c; font:10px 'Share Tech Mono',monospace; white-space:nowrap; }
+.adminStatusLive { color:#00E676; border-color:#00E67640; background:#00E6760c; }
+.adminStatusDone { color:#00D4FF; border-color:#00D4FF40; background:#00D4FF0c; }
+.adminStatusDanger { color:#FF607A; border-color:#FF174440; background:#FF17440c; }
+@media(max-width:620px) {
+ .adminTournamentForm { grid-template-columns:1fr; }
+ .adminFieldWide,.adminFormNote,.adminFormSubmit { grid-column:auto; }
+ .adminTournamentRow { align-items:flex-start; flex-direction:column; }
+ .adminTournamentActions { align-items:flex-start; flex-direction:row; flex-wrap:wrap; }
+ .adminTournamentIdentity { align-items:flex-start; }
+}
