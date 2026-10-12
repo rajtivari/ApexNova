@@ -714,3 +714,118 @@ body { background:#02020c; color:#e8e8ff; font-family:'Exo 2','Space Grotesk',sa
  .hero-sub { font-size:14px; }
  .nova-site .workspace { padding:38px 18px; }
 }
+
+
+/* Exact selectors used by the current homepage JSX */
+.nova-site .hero-description { max-width:520px; margin:0 0 24px; color:#7777a7; font-size:14px; line-height:1.8; }
+.nova-site .hero-cta { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.nova-site .button-primary,.nova-site .button-quiet { display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:46px; padding:13px 17px; text-decoration:none; font:11px 'Share Tech Mono',monospace; letter-spacing:.04em; }
+.nova-site .button-primary { color:#02020c; background:linear-gradient(110deg,#00d4ff,#7b2fff); font-weight:700; }
+.nova-site .button-quiet { color:#b0b0d4; border:1px solid #252560; background:#090918; }
+.nova-site .hero-proof { display:flex; flex-wrap:wrap; gap:16px; margin-top:28px; color:#7d7da9; font:9px 'Share Tech Mono',monospace; }
+.nova-site .hero-proof span { display:flex; align-items:center; gap:7px; }
+.nova-site .hero-proof svg { color:#00d4ff; }
+.nova-site .hero-art { position:absolute; right:clamp(15px,6vw,100px); top:50%; transform:translateY(-48%); width:min(37vw,460px); height:410px; }
+.nova-site .art-orbit { position:absolute; inset:30px; border:1px solid #00d4ff22; border-radius:50%; }
+.nova-site .orbit-two { inset:65px 4px; transform:rotate(-32deg); border-color:#7b2fff44; }
+.nova-site .hero-emblem { position:absolute; inset:50px 50px 55px; display:grid; place-items:center; }
+.nova-site .emblem-outer { display:grid; place-items:center; width:230px; height:260px; clip-path:polygon(50% 0,94% 20%,88% 75%,50% 100%,12% 75%,6% 20%); background:linear-gradient(145deg,#00d4ff,#7b2fff 65%,#00d4ff); padding:2px; filter:drop-shadow(0 0 32px #00d4ff22); }
+.nova-site .emblem-inner { position:relative; display:grid; place-items:center; width:100%; height:100%; color:#00d4ff; clip-path:polygon(50% 0,94% 20%,88% 75%,50% 100%,12% 75%,6% 20%); background:radial-gradient(ellipse at center,#1b1440,#050510 70%); }
+.nova-site .emblem-inner span { position:absolute; font:900 98px 'Barlow Condensed',sans-serif; color:#e8e8ff; text-shadow:0 0 30px #7b2fff; }
+.nova-site .emblem-ring { position:absolute; bottom:8px; color:#6060a0; font:9px 'Share Tech Mono',monospace; letter-spacing:.18em; white-space:nowrap; }
+.nova-site .art-panel { position:absolute; z-index:2; display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 14px; border:1px solid #252560; background:#070711ed; box-shadow:0 12px 40px #0005; color:#7777a7; font:9px 'Share Tech Mono',monospace; }
+.nova-site .art-panel b { color:#00e676; font-weight:400; }
+.nova-site .panel-top { top:34px; left:0; right:20px; }
+.nova-site .panel-bottom { bottom:30px; left:8px; right:-10px; }
+.nova-site .panel-bottom>div:first-child { display:grid; gap:5px; }
+.nova-site .panel-bottom small { color:#6060a0; font:9px 'Share Tech Mono',monospace; }
+.nova-site .panel-bottom strong { color:#e8e8ff; font:700 18px 'Barlow Condensed',sans-serif; }
+.nova-site .panel-bottom strong span { color:#00d4ff; }
+.nova-site .panel-time { display:flex; align-items:center; gap:6px; color:#00d4ff; white-space:nowrap; }
+.nova-site .art-vertical { position:absolute; right:-26px; top:140px; writing-mode:vertical-rl; color:#6060a0; font:9px 'Share Tech Mono',monospace; letter-spacing:.18em; }
+.nova-site .art-coordinate { position:absolute; bottom:2px; right:0; color:#6060a0; font:9px 'Share Tech Mono',monospace; line-height:1.7; }
+.nova-site .art-cross { position:absolute; color:#00d4ff; font:20px monospace; }
+.nova-site .cross-a { left:24px; top:110px; }.nova-site .cross-b { right:22px; top:70px; }
+.nova-site .hero-bottomline { position:absolute; left:clamp(18px,8vw,120px); right:clamp(18px,8vw,120px); bottom:18px; display:flex; justify-content:space-between; color:#6060a0; font:9px 'Share Tech Mono',monospace; letter-spacing:.08em; }
+.nova-site .hero-bottomline span { display:flex; align-items:center; gap:8px; }
+.nova-site .hero-bottomline b { color:#00d4ff; font-weight:400; }
+.nova-site .nova-stats { display:grid; grid-template-columns:1.4fr repeat(3,minmax(0,1fr)); gap:0; position:relative; padding:24px clamp(18px,5vw,76px) 40px; border-bottom:1px solid #202044; background:#050510; }
+.nova-site .stat-intro,.nova-site .nova-stat { padding:18px 22px; border-right:1px solid #202044; }
+.nova-site .stat-intro strong { display:block; margin-top:18px; color:#e8e8ff; font:900 clamp(25px,3vw,40px)/.95 'Barlow Condensed',sans-serif; }
+.nova-site .stat-intro em { color:#00d4ff; font-style:normal; }
+.nova-site .nova-stat { display:flex; flex-direction:column; justify-content:center; gap:9px; }
+.nova-site .stat-icon { color:#00d4ff; }
+.nova-site .nova-stat strong { color:#e8e8ff; font:900 42px 'Barlow Condensed',sans-serif; }
+.nova-site .nova-stat strong span { color:#00d4ff; }
+.nova-site .nova-stat small { color:#6060a0; font:9px 'Share Tech Mono',monospace; }
+.nova-site .stats-note { position:absolute; bottom:10px; right:clamp(18px,5vw,76px); color:#6060a0; font:8px 'Share Tech Mono',monospace; text-align:right; line-height:1.7; }
+.nova-site .stats-note span { color:#7b2fff; }
+.nova-site .tournament-section { padding:76px clamp(18px,5vw,76px); background:linear-gradient(180deg,#070711,#03030d); }
+.nova-site .section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; margin-bottom:30px; }
+.nova-site .section-head h2 { margin:14px 0 8px; color:#e8e8ff; font:900 clamp(44px,6vw,76px)/.9 'Barlow Condensed',sans-serif; }
+.nova-site .section-head h2 span { color:#00d4ff; }
+.nova-site .section-head p { color:#7777a7; margin:0; font-size:13px; }
+.nova-site .text-link { display:inline-flex; align-items:center; gap:9px; color:#00d4ff; font:10px 'Share Tech Mono',monospace; text-decoration:none; white-space:nowrap; }
+.nova-site .tournament-tools { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:22px 0; border-top:1px solid #202044; border-bottom:1px solid #202044; }
+.nova-site .game-filters { display:flex; align-items:center; flex-wrap:wrap; gap:5px; }
+.nova-site .game-filters button { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 13px; color:#7777a7; background:transparent; border:0; border-bottom:2px solid transparent; cursor:pointer; font:10px 'Share Tech Mono',monospace; }
+.nova-site .game-filters button.filter-active { color:#00d4ff; border-bottom-color:#00d4ff; }
+.nova-site .game-filters button span:not(.game-mini) { color:#7b2fff; }
+.nova-site .game-mini { display:grid; place-items:center; width:20px; height:20px; font:10px 'Barlow Condensed',sans-serif; }
+.nova-site .game-mini.ff { color:#ff8c00; border:1px solid #ff8c0055; }.nova-site .game-mini.bg { color:#00d4ff; border:1px solid #00d4ff55; }
+.nova-site .tournament-search { display:flex; align-items:center; gap:8px; width:min(280px,100%); padding:0 10px; color:#6060a0; border:1px solid #202044; background:#050510; }
+.nova-site .tournament-search input { width:100%; min-width:0; min-height:40px; color:#e8e8ff; background:transparent; border:0; outline:0; font:11px 'Exo 2',sans-serif; }
+.nova-site .tournament-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.nova-site .tournament-card { min-width:0; overflow:hidden; border:1px solid #202044; background:#080815; transition:border-color .2s,transform .2s; }
+.nova-site .tournament-card:hover { transform:translateY(-3px); border-color:#00d4ff88; }
+.nova-site .card-art { position:relative; min-height:145px; overflow:hidden; padding:18px; background:radial-gradient(ellipse at 75% 45%,#31145a99,transparent 45%),linear-gradient(110deg,#0b0b1e,#060610); border-bottom:1px solid #202044; }
+.nova-site .card-art-lines { position:absolute; inset:0; opacity:.35; background:repeating-linear-gradient(135deg,transparent 0 19px,#00d4ff10 20px 21px); }
+.nova-site .card-game-stamp { position:relative; color:#00d4ff; font:11px 'Share Tech Mono',monospace; letter-spacing:.08em; }
+.nova-site .card-game-stamp span { display:block; margin-top:5px; color:#6060a0; font-size:8px; }
+.nova-site .card-game-mark { position:absolute; right:25px; top:15px; color:#e8e8ff0d; font:900 100px/.9 'Barlow Condensed',sans-serif; }
+.nova-site .card-number { position:absolute; bottom:13px; left:18px; color:#6060a0; font:9px 'Share Tech Mono',monospace; }
+.nova-site .card-tag { position:absolute; right:14px; bottom:12px; padding:5px 7px; color:#ffb65c; border:1px solid #ff8c0040; background:#ff8c000c; font:8px 'Share Tech Mono',monospace; }
+.nova-site .card-content { padding:18px; }
+.nova-site .card-meta { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; color:#6060a0; font:9px 'Share Tech Mono',monospace; }
+.nova-site .card-live { color:#00e676; }
+.nova-site .card-content h3 { margin:13px 0 6px; color:#e8e8ff; font:900 29px 'Barlow Condensed',sans-serif; letter-spacing:.035em; }
+.nova-site .card-mode { display:flex; align-items:center; gap:7px; color:#7777a7; font-size:11px; }
+.nova-site .card-prizes { display:grid; grid-template-columns:1fr 1fr; margin:18px 0; border:1px solid #202044; background:#050510; }
+.nova-site .card-prizes>div { padding:13px; }
+.nova-site .card-prizes>div+div { border-left:1px solid #202044; }
+.nova-site .card-prizes small { display:block; color:#6060a0; font:8px 'Share Tech Mono',monospace; }
+.nova-site .card-prizes strong { display:block; margin-top:5px; color:#ffd700; font:900 26px 'Barlow Condensed',sans-serif; }
+.nova-site .card-prizes strong.free-entry { color:#00e676; }
+.nova-site .slot-line>div:first-child { display:flex; justify-content:space-between; color:#6060a0; font:8px 'Share Tech Mono',monospace; }
+.nova-site .slot-line b { color:#a5a5cc; font-weight:400; }
+.nova-site .slot-track { height:3px; margin-top:8px; background:#202044; }
+.nova-site .slot-track i { display:block; height:100%; background:linear-gradient(90deg,#00d4ff,#7b2fff); }
+.nova-site .card-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-top:18px; padding-top:14px; border-top:1px solid #202044; }
+.nova-site .card-footer>span,.nova-site .card-footer>a { display:flex; align-items:center; gap:7px; color:#7777a7; font:9px 'Share Tech Mono',monospace; text-decoration:none; }
+.nova-site .card-footer>span svg { color:#00d4ff; }
+.nova-site .card-footer>a { color:#00d4ff; }
+.nova-site .demo-disclaimer { display:flex; align-items:flex-start; gap:8px; margin:20px 0 0; color:#6060a0; font-size:11px; line-height:1.7; }
+.nova-site .demo-disclaimer svg { flex:0 0 auto; color:#00d4ff; }
+@media(max-width:900px) {
+ .nova-site .hero-art { right:8px; opacity:.48; width:42vw; }
+ .nova-site .hero-copy { max-width:70%; }
+ .nova-site .nova-stats { grid-template-columns:repeat(3,minmax(0,1fr)); }
+ .nova-site .stat-intro { grid-column:1/-1; border-right:0; border-bottom:1px solid #202044; }
+}
+@media(max-width:620px) {
+ .nova-site .hero-copy { max-width:100%; }
+ .nova-site .hero-art { right:-90px; opacity:.23; width:360px; pointer-events:none; }
+ .nova-site .hero-bottomline { font-size:8px; }
+ .nova-site .hero-proof { gap:10px; font-size:8px; }
+ .nova-site .nova-stats { grid-template-columns:repeat(2,minmax(0,1fr)); padding-bottom:52px; }
+ .nova-site .nova-stat { border-bottom:1px solid #202044; padding:14px; }
+ .nova-site .nova-stat:nth-of-type(3) { border-right:0; }
+ .nova-site .tournament-section { padding:46px 18px; }
+ .nova-site .section-head { align-items:flex-start; flex-direction:column; }
+ .nova-site .tournament-tools { align-items:stretch; flex-direction:column; padding:8px 0; }
+ .nova-site .game-filters { justify-content:space-between; }
+ .nova-site .game-filters button { padding:0 6px; font-size:9px; }
+ .nova-site .tournament-search { width:100%; }
+ .nova-site .tournament-grid { grid-template-columns:1fr; }
+ .nova-site .card-content { padding:15px; }
+}
