@@ -1,6 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="26" fill="#10151a"/>
-  <path d="M64 14 110 101H91L64 49 37 101H18L64 14Z" fill="#ff5a36"/>
-  <path d="M48 78h32l9 17H39l9-17Z" fill="#f5f7fa"/>
-  <circle cx="64" cy="64" r="52" fill="none" stroke="#ff5a36" stroke-width="2" opacity=".45"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">Apex Nova shield</title>
+  <defs>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#00D4FF"/><stop offset="1" stop-color="#0088AA"/></linearGradient>
+    <linearGradient id="nova" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#00D4FF"/><stop offset="1" stop-color="#7B2FFF"/></linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="#02020C"/>
+  <circle cx="64" cy="64" r="52" fill="#00D4FF" opacity=".055"/>
+  <circle cx="64" cy="64" r="49" fill="none" stroke="#00D4FF" stroke-opacity=".22"/>
+  <g stroke="#7B2FFF" stroke-width="2" opacity=".55"><path d="M12 37 33 48M95 80l21 11M22 94l17-9M88 40l19-12"/></g>
+  <g stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round" filter="url(#glow)"><path d="m20 25 7 5-2-9M103 24l-5 8 10-1M19 99l9-2-4 8M108 99l-8-3 2 9"/></g>
+  <path d="M64 13 105 36v48L64 111 23 84V36Z" fill="#050510" stroke="url(#cyan)" stroke-width="4" filter="url(#glow)"/>
+  <path d="m64 29-25 56h13l12-28 12 28h13L64 29Z" fill="url(#nova)"/>
+  <path d="m64 49 10 14H54Z" fill="#FF8C00" filter="url(#glow)"/>
+  <path d="M44 76h40" stroke="#FF8C00" stroke-width="4" stroke-linecap="square"/>
+  <path d="M29 39 49 50M79 78l20 11M36 87l12-7M81 48l15-9" stroke="#E8E8FF" stroke-opacity=".24" stroke-width="1.5"/>
 </svg>
