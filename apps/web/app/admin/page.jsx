@@ -31,6 +31,10 @@ export default function AdminPage() {
   const [teams, setTeams] = useState([]);
   const [matches, setMatches] = useState([]);
   const [registrations, setRegistrations] = useState([]);
+  const [kycRows, setKycRows] = useState([]);
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [kycPreview, setKycPreview] = useState(null);
+  const [prizeForm, setPrizeForm] = useState({ resultId: '', amount: '' });
   const [staffForm, setStaffForm] = useState({ displayName: '', email: '', password: '', role: 'WORKER' });
   const [matchForm, setMatchForm] = useState({ tournamentId: '', round: 'Round 1', scheduledAt: '', roomId: '', roomPassword: '' });
   const [loading, setLoading] = useState(true);
@@ -58,6 +62,12 @@ export default function AdminPage() {
         } catch { return []; }
       }));
       setRegistrations(registrationGroups.flat());
+      const [identityRows, payoutRows] = await Promise.all([
+        api('/api/kyc/admin', current.accessToken).catch(() => []),
+        api('/api/wallet/pending', current.accessToken).catch(() => []),
+      ]);
+      setKycRows(Array.isArray(identityRows) ? identityRows : []);
+      setWithdrawals(Array.isArray(payoutRows) ? payoutRows : []);
     } catch (err) { setError(err.message || 'Unable to load admin data.'); }
     finally { setLoading(false); }
   }, []);
@@ -115,6 +125,57 @@ export default function AdminPage() {
       await load(session);
     } catch (err) { setError(err.message || 'Could not schedule match.'); }
     finally { setBusy(false); }
+  }
+
+  async function reviewPayment(row, status) {
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/tournaments/' + row.tournamentId + '/registrations/' + row.id + '/payment', session.accessToken, { method: 'PATCH', body: JSON.stringify({ status }) });
+      setMessage('Entry payment ' + status.toLowerCase() + '.');
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not review the entry payment.'); }
+    finally { setBusy(false); }
+  }
+
+  async function reviewKyc(row, status) {
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/kyc/' + row.userId + '/review', session.accessToken, { method: 'PATCH', body: JSON.stringify({ status, ...(status === 'REJECTED' ? { note: 'Please resubmit clear identity images and date of birth.' } : {}) }) });
+      setMessage('Identity and age check ' + status.toLowerCase() + '.');
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not review identity verification.'); }
+    finally { setBusy(false); }
+  }
+
+  async function reviewWithdrawal(row, status) {
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/wallet/withdrawals/' + row.id, session.accessToken, { method: 'PATCH', body: JSON.stringify({ status }) });
+      setMessage(status === 'PAID' ? 'Payout marked paid. Send the transfer to the shown UPI ID before confirming.' : 'Payout rejected and prize balance returned.');
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not review payout.'); }
+    finally { setBusy(false); }
+  }
+
+  async function awardPrize(event) {
+    event.preventDefault(); setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/wallet/prizes', session.accessToken, { method: 'POST', body: JSON.stringify({ resultId: prizeForm.resultId, amount: Number(prizeForm.amount) }) });
+      setPrizeForm({ resultId: '', amount: '' });
+      setMessage('Prize credited to the team captain’s wallet.');
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not credit the prize.'); }
+    finally { setBusy(false); }
+  }
+
+  async function viewKycDocument(row, kind) {
+    setError('');
+    try {
+      const response = await fetch(API_BASE_URL + '/api/kyc/' + row.userId + '/documents/' + kind, { headers: { Authorization: 'Bearer ' + session.accessToken } });
+      if (!response.ok) throw new Error('Document is unavailable or secure storage is not configured.');
+      const url = URL.createObjectURL(await response.blob());
+      setKycPreview((current) => { if (current?.url) URL.revokeObjectURL(current.url); return { url, kind, name: row.user?.profile?.displayName || row.user?.email }; });
+    } catch (err) { setError(err.message || 'Could not open the verification image.'); }
   }
 
   async function reviewRegistration(row, status) {
