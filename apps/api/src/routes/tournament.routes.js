@@ -12,6 +12,7 @@ const tournamentSchema = z.object({
   prizePool: z.number().finite().nonnegative().max(100_000_000).default(0),
   startsAt: z.coerce.date(),
   registrationClosesAt: z.coerce.date(),
+  rules: z.string().trim().min(10).max(5000),
 }).refine((data) => data.registrationClosesAt < data.startsAt, {
   message: 'Registration must close before the tournament starts',
   path: ['registrationClosesAt'],
@@ -30,7 +31,12 @@ const statusSchema = z.object({
     'CANCELLED',
   ]),
 });
-const registrationSchema = z.object({ teamId: z.string().min(1) });
+const registrationSchema = z.object({
+  teamId: z.string().min(1),
+  gameUid: z.string().trim().min(3).max(40).regex(/^[A-Za-z0-9._-]+$/),
+  inGameName: z.string().trim().min(2).max(40),
+  rulesAccepted: z.literal(true),
+});
 const registrationReviewSchema = z.object({ status: z.enum(['APPROVED', 'REJECTED']) });
 
 const allowedTransitions = {
@@ -55,6 +61,7 @@ router.get('/', async (req, res) => {
       prizePool: true,
       startsAt: true,
       registrationClosesAt: true,
+      rules: true,
       _count: { select: { registrations: true, matches: true } },
     },
     orderBy: { startsAt: 'asc' },
@@ -134,7 +141,7 @@ router.post('/:id/register', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) =>
   try {
     const registration = await prisma.$transaction(async (tx) => {
       const created = await tx.tournamentRegistration.create({
-        data: { tournamentId: tournament.id, teamId: team.id, status: 'PENDING' },
+        data: { tournamentId: tournament.id, teamId: team.id, status: 'PENDING', gameUid: input.gameUid, inGameName: input.inGameName, rulesAcceptedAt: new Date() },
       });
       await logAction(tx, {
         actorId: req.user.id,
