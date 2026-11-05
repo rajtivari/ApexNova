@@ -75,16 +75,24 @@ export default function Home() {
           <div className="arena-hero-actions"><a className="arena-cta-button arena-cta-large" href="#matches">Explore tournaments <ArrowRight size={18}/></a><a className="arena-text-button" href={LOGIN_URL}>Open player hub <span>↗</span></a></div>
           <div className="arena-trust-row"><span><ShieldCheck size={16}/> Reviewed results</span><span><Users size={16}/> Squad ready</span><span><Wallet size={16}/> Prize history</span></div>
         </div>
-        <div className="arena-hero-visual">
-          <div className="arena-visual-orbit arena-orbit-one"/><div className="arena-visual-orbit arena-orbit-two"/>
-          <div className="arena-visual-grid"/>
-          <div className="arena-visual-stamp">APX<br/><b>ARENA</b></div>
-          <div className="arena-match-card">
-            <div className="arena-match-card-top"><span><i className={'arena-status-dot ' + (nextEvent ? 'is-live' : '')}/>{nextEvent ? 'OPEN FOR PLAYERS' : 'THE NEXT ROUND'}</span><span>IND / 01</span></div>
-            <div className="arena-versus"><div className="arena-game-chip"><Gamepad2 size={20}/><span>{nextEvent?.game || 'FREE FIRE'}<small>{nextEvent?.format || 'SQUAD TOURNAMENT'}</small></span></div><span className="arena-versus-mark">VS</span><div className="arena-game-chip arena-game-chip-alt"><Trophy size={20}/><span>YOUR SQUAD<small>YOUR NEXT WIN</small></span></div></div>
-            <div className="arena-match-card-bottom"><span>{nextEvent?.name || 'Find your next lobby'}</span><b>{nextEvent ? money(nextEvent.prize) : 'APEX NOVA'}</b></div>
+        <div className="arena-hero-visual" aria-label="ApexNova mobile esports photography">
+          <figure className="arena-photo-frame arena-photo-main">
+            <img src="https://images.unsplash.com/photo-1759701547448-f3f336e478cd?auto=format&fit=crop&w=1400&q=82" alt="A player focused on a mobile esports match" width="1200" height="1500" fetchPriority="high" decoding="async" />
+            <div className="arena-photo-overlay"><span className="arena-photo-kicker"><i/> INDIA / MOBILE ESPORTS</span><strong>PLAY WITH<br/>PURPOSE.</strong><span className="arena-photo-games">FREE FIRE <b>·</b> BGMI</span></div>
+            <a className="arena-photo-credit" href="https://unsplash.com/photos/young-man-focused-on-playing-a-mobile-game-f-v7T77L-14" target="_blank" rel="noreferrer">Photo: Alef Morais / Unsplash</a>
+          </figure>
+          <div className="arena-photo-rail">
+            <figure className="arena-photo-frame arena-photo-secondary">
+              <img src="https://images.unsplash.com/photo-1548003693-b55d51032288?auto=format&fit=crop&w=1000&q=80" alt="Two players competing at gaming stations" width="1000" height="760" loading="lazy" decoding="async" />
+              <div className="arena-photo-secondary-label">SQUADS / SKILL / SHOW UP</div>
+              <a className="arena-photo-credit" href="https://unsplash.com/photos/selective-focus-photography-of-two-persons-playing-game-in-front-of-monitors-lfQyS-TnqEg" target="_blank" rel="noreferrer">Photo: Alex Haney / Unsplash</a>
+            </figure>
+            <div className="arena-live-card">
+              <div className="arena-live-card-head"><span><i className={'arena-status-dot ' + (feedState === 'online' ? 'is-live' : '')}/>{feedState === 'online' ? 'TOURNAMENT FEED' : feedState === 'loading' ? 'CONNECTING' : 'FEED OFFLINE'}</span><Gamepad2 size={17}/></div>
+              {nextEvent ? <><strong>{nextEvent.name}</strong><small>{nextEvent.game} · {nextEvent.format}</small></> : <><strong>{feedState === 'offline' ? 'Matches are temporarily unavailable.' : feedState === 'loading' ? 'Checking published matches…' : 'No upcoming events listed.'}</strong><small>Only events published by the tournament desk appear here.</small></>}
+              <a href="#matches">Browse matches <ArrowRight size={15}/></a>
+            </div>
           </div>
-          <div className="arena-visual-caption"><span>QUEUE UP / PLAY FAIR / LEVEL UP</span><span>01 — 04</span></div>
         </div>
       </section>
 
@@ -98,8 +106,8 @@ export default function Home() {
         <div className="arena-section-heading"><div><p className="arena-eyebrow"><span>02 / FIND A LOBBY</span></p><h2>UPCOMING <em>MATCHES</em></h2><p>Choose your game and find an event that fits your squad.</p></div><a className="arena-text-button" href={LOGIN_URL}>Go to player hub <span>↗</span></a></div>
         <div className="arena-match-tools"><div className="arena-game-filters"><button className={game === 'ALL' ? 'is-selected' : ''} onClick={() => setGame('ALL')}>All games</button><button className={game === 'FREE FIRE' ? 'is-selected' : ''} onClick={() => setGame('FREE FIRE')}>Free Fire</button><button className={game === 'BGMI' ? 'is-selected' : ''} onClick={() => setGame('BGMI')}>BGMI</button></div><label className="arena-search"><Search size={16}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search tournaments" aria-label="Search tournaments"/></label></div>
         {feedState === 'offline' ? <div className="arena-empty-state"><span className="arena-empty-icon"><Zap size={22}/></span><div><b>Match feed is taking a break.</b><p>We couldn’t reach the tournament service. Check back when the arena is online.</p></div><a href={LOGIN_URL}>Player sign in <ArrowRight size={15}/></a></div> :
-          feedState === 'loading' ? <div className="arena-event-grid"><div className="arena-event-skeleton"/><div className="arena-event-skeleton"/><div className="arena-event-skeleton"/></div> :
-          visible.length ? <div className="arena-event-grid">{visible.map((event) => <article className="arena-event-card" key={event.id}><div className="arena-event-card-head"><span className="arena-event-game">{event.game}</span><span className="arena-event-status">{event.status}</span></div><h3>{event.name}</h3><p className="arena-event-format">{event.format}</p><div className="arena-event-details"><div><small>PRIZE POOL</small><b>{money(event.prize)}</b></div><div><small>ENTRY</small><b className={event.fee === 0 ? 'is-free' : ''}>{event.fee === 0 ? 'Free' : money(event.fee)}</b></div></div><p className="arena-event-date"><CalendarDays size={15}/>{event.date}</p><a href={LOGIN_URL}>View event <ArrowRight size={15}/></a></article>)}</div> :
+          feedState === 'loading' ? <div className="arena-empty-state" role="status"><span className="arena-empty-icon"><Gamepad2 size={22}/></span><div><b>Checking published matches…</b><p>Match cards will appear when the tournament desk publishes an event.</p></div></div> :
+          visible.length ? <div className="arena-event-grid">{visible.map((event) => <article className="arena-event-card" key={event.id}><img className="arena-event-photo" src={event.game === 'FREE FIRE' ? 'https://images.unsplash.com/photo-1759701547448-f3f336e478cd?auto=format&fit=crop&w=1000&q=76' : 'https://images.unsplash.com/photo-1548003693-b55d51032288?auto=format&fit=crop&w=1000&q=76'} alt={event.game === 'FREE FIRE' ? 'Player focused on a mobile esports match' : 'Players competing at gaming stations'} width="1000" height="560" loading="lazy" decoding="async"/><div className="arena-event-card-head"><span className="arena-event-game">{event.game}</span><span className="arena-event-status">{event.status}</span></div><h3>{event.name}</h3><p className="arena-event-format">{event.format}</p><div className="arena-event-details"><div><small>PRIZE POOL</small><b>{money(event.prize)}</b></div><div><small>ENTRY</small><b className={event.fee === 0 ? 'is-free' : ''}>{event.fee === 0 ? 'Free' : money(event.fee)}</b></div></div><p className="arena-event-date"><CalendarDays size={15}/>{event.date}</p><a href={LOGIN_URL}>View event <ArrowRight size={15}/></a></article>)}</div> :
           <div className="arena-empty-state"><span className="arena-empty-icon"><Gamepad2 size={22}/></span><div><b>No matches are listed right now.</b><p>New events will appear here as soon as the tournament desk publishes them.</p></div><a href={LOGIN_URL}>Join ApexNova <ArrowRight size={15}/></a></div>}
       </section>
 
