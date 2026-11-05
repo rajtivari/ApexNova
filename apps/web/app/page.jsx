@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, CalendarDays, Gamepad2, Menu, Search, ShieldCheck, Trophy, Users, Wallet, X, Zap } from 'lucide-react';
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://apexnova-api.onrender.com').replace(/\//$/, '');
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://apexnova-api.onrender.com').replace(/\/$/, ''));
 const LOGIN_URL = '/ApexNova/login/';
 const money = (value) => '₹' + Number(value || 0).toLocaleString('en-IN');
 
