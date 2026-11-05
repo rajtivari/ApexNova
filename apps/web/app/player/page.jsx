@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2, CircleDollarSign, Gamepad2, Gamepad2, LogOut, RefreshCw, ShieldCheck, Swords, Users, Wallet } from 'lucide-react';
+import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2, CircleDollarSign, Gamepad2, LogOut, RefreshCw, ShieldCheck, Swords, Users, Wallet } from 'lucide-react';
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://apexnova-api.onrender.com').replace(/\/$/, '');
 const SESSION_KEY = 'apexnova-local-session-v1';
