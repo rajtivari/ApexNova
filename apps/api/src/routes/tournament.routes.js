@@ -156,7 +156,7 @@ router.post('/:id/register', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) =>
         action: 'TOURNAMENT_REGISTRATION_SUBMITTED',
         entity: 'TournamentRegistration',
         entityId: created.id,
-        metadata: { tournamentId: tournament.id, teamId: team.id, paidEntry: isPaid, paymentReference: isPaid ? input.paymentReference : undefined },
+        metadata: { tournamentId: tournament.id, teamId: team.id, paidEntry: isPaid, ...(isPaid ? { paymentReference: input.paymentReference } : {}) },
       });
       return created;
     });
