@@ -10,7 +10,8 @@ ApexNova is an eSports tournament operations platform for Free Fire and BGMI. Th
 - Server-issued roles; public registration can create player accounts only.
 - Super-admin bootstrap script that reads credentials from environment variables.
 - Team creation, roster membership, tournament listing and lifecycle controls.
-- Tournament rules, player game UID/in-game name, and recorded rules acceptance on registration.\n- Free tournament registration with staff approval/rejection; paid entry can use a configured UPI QR and UTR reference with separate staff payment review.
+- Tournament rules, player game UID/in-game name, and recorded rules acceptance on registration.
+- Free tournament registration with staff approval/rejection; paid entry can use a configured UPI QR and UTR reference with separate staff payment review.
 - Match creation, team-scoped result submissions, staff result review, standings recalculation, and dispute resolution.
 - User-scoped notifications, an approved-prize wallet ledger, super-admin prize credits, and UPI or bank withdrawal requests with balance reservation and staff payout review.\n- Optional private identity and age review: encrypted selfie and masked Aadhaar images, admin-only access, deletion after review, and retention of the age-verification outcome only.
 - Audit logging, safe API error responses, production configuration checks, database health endpoint, and graceful shutdown.
