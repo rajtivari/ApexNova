@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.routes.js';
 import matchRoutes from './routes/match.routes.js';
 import disputeRoutes from './routes/dispute.routes.js';
 import walletRoutes from './routes/wallet.routes.js';
+import kycRoutes from './routes/kyc.routes.js';
 import teamRoutes from './routes/team.routes.js';
 import { authenticate } from './middleware/auth.js';
 
@@ -22,6 +23,12 @@ if (process.env.NODE_ENV === 'production') {
   }
   if (!process.env.CORS_ORIGINS?.trim()) {
     throw new Error('Production requires CORS_ORIGINS.');
+  }
+  if (process.env.PAYMENTS_ENABLED === 'true' && (!process.env.ESPORTS_REGISTRATION_ID || !process.env.UPI_QR_URL)) {
+    throw new Error('Paid tournament entry requires ESPORTS_REGISTRATION_ID and UPI_QR_URL.');
+  }
+  if (process.env.KYC_UPLOADS_ENABLED === 'true' && (!process.env.UIDAI_OVSE_ID || !process.env.KYC_PRIVATE_STORAGE_DIR || !/^[a-fA-F0-9]{64}$/.test(process.env.DATA_ENCRYPTION_KEY || ''))) {
+    throw new Error('KYC uploads require UIDAI_OVSE_ID, private persistent storage, and a 32-byte DATA_ENCRYPTION_KEY.');
   }
 }
 
@@ -51,7 +58,7 @@ app.use(cors({
     return callback(new Error('Origin not allowed by CORS'));
   },
 }));
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '7mb' }));
 
 app.get('/api/health', async (_, res) => {
   try {
@@ -77,6 +84,7 @@ app.use('/api/matches', (req, res, next) => {
 }, matchRoutes);
 app.use('/api/disputes', authenticate, disputeRoutes);
 app.use('/api/wallet', authenticate, walletRoutes);
+app.use('/api/kyc', authenticate, kycRoutes);
 
 app.get('/api/docs', (_, res) => res.json({
   openapi: '3.0.0',
@@ -97,7 +105,11 @@ app.get('/api/docs', (_, res) => res.json({
     '/api/disputes': { get: { summary: 'List disputes (staff)' }, post: { summary: 'Open dispute' } },
     '/api/disputes/mine': { get: { summary: 'List disputes opened by current user' } },
     '/api/notifications': { get: { summary: 'List current user notifications' } },
-    '/api/wallet/{userId}': { get: { summary: 'Read wallet (super admin)' } },
+    '/api/wallet/me': { get: { summary: 'Read your prize wallet and transaction ledger' } },
+    '/api/wallet/withdraw': { post: { summary: 'Request payout of approved prize funds to UPI' } },
+    '/api/wallet/prizes': { post: { summary: 'Credit an approved match prize (super admin)' } },
+    '/api/kyc/me': { get: { summary: 'Read current identity review status' }, post: { summary: 'Submit encrypted selfie and masked Aadhaar image' } },
+    '/api/kyc/admin': { get: { summary: 'List identity verification requests (staff)' } },
   },
 }));
 

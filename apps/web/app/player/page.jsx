@@ -6,6 +6,8 @@ import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2, CircleDollarSig
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://apexnova-api.onrender.com').replace(/\/$/, '');
 const SESSION_KEY = 'apexnova-local-session-v1';
+const UPI_QR_URL = process.env.NEXT_PUBLIC_UPI_QR_URL || '';
+const KYC_UPLOADS_ENABLED = process.env.NEXT_PUBLIC_KYC_UPLOADS_ENABLED === 'true';
 const money = (value) => '₹' + Number(value || 0).toLocaleString('en-IN');
 
 async function api(path, token, options = {}) {
@@ -30,8 +32,14 @@ export default function PlayerPage() {
   const [teams, setTeams] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [matches, setMatches] = useState([]);
+  const [wallet, setWallet] = useState({ balance: 0, transactions: [] });
+  const [kyc, setKyc] = useState({ status: 'NOT_SUBMITTED' });
+  const [kycForm, setKycForm] = useState({ selfie: null, aadhaarImage: null, consent: false });
+  const [withdrawForm, setWithdrawForm] = useState({ amount: '', method: 'UPI', upiVpa: '', accountName: '', accountNumber: '', ifsc: '' });
   const [teamName, setTeamName] = useState('');
   const [memberEmail, setMemberEmail] = useState('');
+  const [selectedTournament, setSelectedTournament] = useState(null);
+  const [joinForm, setJoinForm] = useState({ gameUid: '', inGameName: '', rulesAccepted: false, paymentReference: '' });
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -45,18 +53,22 @@ export default function PlayerPage() {
     setLoading(true);
     setError('');
     try {
-      const [me, events, roster, alerts, matchRows] = await Promise.all([
+      const [me, events, roster, alerts, matchRows, walletData, kycData] = await Promise.all([
         api('/api/auth/me', currentSession.accessToken),
         api('/api/tournaments'),
         api('/api/teams', currentSession.accessToken),
         api('/api/notifications', currentSession.accessToken),
         api('/api/matches'),
+        api('/api/wallet/me', currentSession.accessToken),
+        api('/api/kyc/me', currentSession.accessToken),
       ]);
       setProfile(me.user);
       setTournaments(Array.isArray(events) ? events : []);
       setTeams(Array.isArray(roster) ? roster : []);
       setNotifications(Array.isArray(alerts) ? alerts : []);
       setMatches(Array.isArray(matchRows) ? matchRows : []);
+      setWallet(walletData || { balance: 0, transactions: [] });
+      setKyc(kycData || { status: 'NOT_SUBMITTED' });
     } catch (err) {
       setError(err.message || 'Could not load your player workspace.');
     } finally {
@@ -103,13 +115,25 @@ export default function PlayerPage() {
       setError('Create a squad first. Tournament registration is captain-led.');
       return;
     }
+    if (!joinForm.gameUid.trim() || !joinForm.inGameName.trim() || !joinForm.rulesAccepted || (Number(tournament.entryFee || 0) > 0 && !joinForm.paymentReference.trim())) {
+      setError('Enter your game UID and in-game name, accept the rules, and add the UPI reference for a paid entry.');
+      return;
+    }
     setBusy(true); setError(''); setMessage('');
     try {
       await api('/api/tournaments/' + tournament.id + '/register', session.accessToken, {
         method: 'POST',
-        body: JSON.stringify({ teamId: team.id }),
+        body: JSON.stringify({
+          teamId: team.id,
+          gameUid: joinForm.gameUid.trim(),
+          inGameName: joinForm.inGameName.trim(),
+          rulesAccepted: joinForm.rulesAccepted,
+          ...(Number(tournament.entryFee || 0) > 0 ? { paymentReference: joinForm.paymentReference.trim() } : {}),
+        }),
       });
-      setMessage('Registration submitted. Check the tournament status for staff approval.');
+      setMessage(Number(tournament.entryFee || 0) > 0 ? 'UPI reference submitted. Staff will verify payment before approving your registration.' : 'Registration submitted. Your game ID and rules acceptance were recorded. Check the tournament status for staff approval.');
+      setSelectedTournament(null);
+      setJoinForm({ gameUid: '', inGameName: '', rulesAccepted: false, paymentReference: '' });
       await load(session);
     } catch (err) {
       setError(err.message || 'Could not register this squad.');
@@ -139,6 +163,46 @@ export default function PlayerPage() {
       setMessage('Player removed from your squad.');
       await load(session);
     } catch (err) { setError(err.message || 'Could not remove player.'); }
+    finally { setBusy(false); }
+  }
+
+  async function readImage(file) {
+    if (!file) return null;
+    if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 2 * 1024 * 1024) throw new Error('Use a JPEG or PNG image no larger than 2 MB.');
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ dataUrl: String(reader.result), mimeType: file.type });
+      reader.onerror = () => reject(new Error('Could not read the selected image.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function setKycImage(field, file) {
+    setError('');
+    try { const image = await readImage(file); setKycForm((current) => ({ ...current, [field]: image })); }
+    catch (err) { setError(err.message); }
+  }
+
+  async function submitKyc(event) {
+    event.preventDefault(); const formElement = event.currentTarget; setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/kyc/me', session.accessToken, { method: 'POST', body: JSON.stringify(kycForm) });
+      setKycForm({ selfie: null, aadhaarImage: null, consent: false });
+      formElement.reset();
+      setMessage('Identity and age documents sent for private staff review.');
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not submit identity verification.'); }
+    finally { setBusy(false); }
+  }
+
+  async function requestWithdrawal(event) {
+    event.preventDefault(); setBusy(true); setError(''); setMessage('');
+    try {
+      const result = await api('/api/wallet/withdraw', session.accessToken, { method: 'POST', body: JSON.stringify({ amount: Number(withdrawForm.amount), method: withdrawForm.method, ...(withdrawForm.method === 'UPI' ? { upiVpa: withdrawForm.upiVpa.trim() } : { accountName: withdrawForm.accountName.trim(), accountNumber: withdrawForm.accountNumber.trim(), ifsc: withdrawForm.ifsc.trim().toUpperCase() }) }) });
+      setWithdrawForm({ amount: '', method: 'UPI', upiVpa: '', accountName: '', accountNumber: '', ifsc: '' });
+      setMessage('Withdrawal request submitted. ' + money(result.balance) + ' remains in your prize wallet.');
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not submit withdrawal request.'); }
     finally { setBusy(false); }
   }
 
@@ -206,12 +270,12 @@ export default function PlayerPage() {
         <div className="playerPanelHeading"><div><p className="eyebrow">LIVE API FEED</p><h2>TOURNAMENT <span className="ember">LINEUP.</span></h2></div><span className="playerLiveTag"><i className="pulse"/> API CONNECTED</span></div>
         {loading ? <div className="playerEmpty">SYNCING TOURNAMENTS…</div> : tournaments.length === 0 ? <div className="playerEmpty">NO TOURNAMENTS PUBLISHED YET. CHECK BACK SOON.</div> : <div className="playerEventList">{tournaments.map((event) => {
           const start = new Date(event.startsAt);
-          const canJoin = event.status === 'REGISTRATION_OPEN' && Number(event.entryFee || 0) === 0;
+          const canJoin = event.status === 'REGISTRATION_OPEN' && (Number(event.entryFee || 0) === 0 || Boolean(UPI_QR_URL));
           return <article className="playerEventRow" key={event.id}>
             <div className="playerEventIcon"><Gamepad2 size={20}/></div>
             <div className="playerEventMain"><div className="playerEventMeta"><span>{event.game === 'FREE_FIRE' ? 'FREE FIRE' : event.game}</span><span>{String(event.status).replaceAll('_', ' ')}</span></div><h3>{event.name}</h3><p><CalendarDays size={14}/>{Number.isNaN(start.getTime()) ? 'Time to be announced' : start.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })} <b>·</b> {String(event.format).replaceAll('_', ' ')}</p></div>
             <div className="playerEventPrize"><small>PRIZE POOL</small><strong>{money(event.prizePool)}</strong><small>ENTRY {Number(event.entryFee || 0) === 0 ? 'FREE' : money(event.entryFee)}</small></div>
-            {canJoin ? <button className="secondaryButton playerJoinButton" onClick={() => joinTournament(event)} disabled={busy || !myTeam || myTeam.captain?.id !== profile?.id}>{myTeam?.captain?.id === profile?.id ? 'REGISTER SQUAD' : 'CAPTAIN ONLY'} <ArrowRight size={14}/></button> : <span className="playerEventStatus">{Number(event.entryFee || 0) > 0 ? 'PAID ENTRY DISABLED' : String(event.status).replaceAll('_', ' ')}</span>}
+            {canJoin ? <button className="secondaryButton playerJoinButton" onClick={() => { setSelectedTournament(event); setJoinForm({ gameUid: '', inGameName: '', rulesAccepted: false, paymentReference: '' }); setError(''); setMessage(''); }} disabled={busy || !myTeam || myTeam.captain?.id !== profile?.id}>{myTeam?.captain?.id === profile?.id ? 'REGISTER SQUAD' : 'CAPTAIN ONLY'} <ArrowRight size={14}/></button> : <span className="playerEventStatus">{Number(event.entryFee || 0) > 0 ? 'PAID ENTRY NOT CONFIGURED' : String(event.status).replaceAll('_', ' ')}</span>}
           </article>;
         })}</div>}
         <p className="playerPanelFoot"><CircleDollarSign size={15}/> Paid registration is deliberately blocked until a verified payment flow is deployed. No wallet balance is simulated here.</p>
@@ -225,6 +289,38 @@ export default function PlayerPage() {
       <section className="playerPanel">
         <div className="playerPanelHeading"><div><p className="eyebrow">PLAYER INBOX</p><h2>RECENT <span className="ember">UPDATES.</span></h2></div><Bell size={22}/></div>
         {notifications.length === 0 ? <div className="playerEmpty">NO NOTIFICATIONS YET.</div> : notifications.slice(0, 5).map((item) => <article className="playerNotification" key={item.id}><span className={item.readAt ? 'notificationDot read' : 'notificationDot'}/><div><strong>{item.title}</strong><p>{item.body}</p><small>{new Date(item.createdAt).toLocaleString('en-IN')}</small></div>{!item.readAt && <button className="secondaryButton" onClick={() => markRead(item)}>MARK READ</button>}</article>)}
+      </section>
+      {selectedTournament && <div className="playerJoinBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setSelectedTournament(null); }}>
+        <form className="playerJoinModal" onSubmit={(event) => { event.preventDefault(); joinTournament(selectedTournament); }} role="dialog" aria-modal="true" aria-labelledby="joinTournamentTitle">
+          <div className="playerJoinHeading"><div><p className="eyebrow">REGISTRATION / {selectedTournament.game === 'FREE_FIRE' ? 'FREE FIRE' : selectedTournament.game}</p><h2 id="joinTournamentTitle">JOIN <span className="ember">{selectedTournament.name}</span></h2></div><button type="button" className="closeButton" aria-label="Close" onClick={() => setSelectedTournament(null)}>×</button></div>
+          <div className="playerRulesBox"><strong>TOURNAMENT RULES</strong><p>{selectedTournament.rules}</p></div>
+          <label className="playerJoinField">IN-GAME UID<input value={joinForm.gameUid} onChange={(event) => setJoinForm({ ...joinForm, gameUid: event.target.value })} minLength={3} maxLength={40} pattern="[A-Za-z0-9._-]+" placeholder="Your exact game UID" required /></label>
+          <label className="playerJoinField">IN-GAME NAME<input value={joinForm.inGameName} onChange={(event) => setJoinForm({ ...joinForm, inGameName: event.target.value })} minLength={2} maxLength={40} placeholder="Name shown in the game" required /></label>
+          {Number(selectedTournament.entryFee || 0) > 0 && <div className="playerPaymentBox"><strong>PAY ENTRY BY UPI · {money(selectedTournament.entryFee)}</strong>{UPI_QR_URL ? <img src={UPI_QR_URL} alt="ApexNova UPI payment QR" /> : <p>UPI QR is not configured for this site yet.</p>}<label className="playerJoinField">UPI TRANSACTION REFERENCE<input value={joinForm.paymentReference} onChange={(event) => setJoinForm({ ...joinForm, paymentReference: event.target.value })} minLength={8} maxLength={40} pattern="[A-Za-z0-9]+" placeholder="Enter the UTR / transaction ID after payment" required /></label><small>Staff verify the reference against the payment before approving the squad.</small></div>}
+
+          <label className="playerRulesAccept"><input type="checkbox" checked={joinForm.rulesAccepted} onChange={(event) => setJoinForm({ ...joinForm, rulesAccepted: event.target.checked })} required /><span>I have read and agree to the tournament rules. My UID and in-game name are correct.</span></label>
+          <p className="playerJoinNote">Entry: {money(selectedTournament.entryFee)} · Registration will be sent for staff approval.</p>
+          {error && <div className="playerNotice playerNoticeError" role="alert">{error}</div>}
+          <div className="playerJoinActions"><button type="button" className="secondaryButton" onClick={() => setSelectedTournament(null)} disabled={busy}>CANCEL</button><button className="primaryButton" type="submit" disabled={busy}>{busy ? 'SUBMITTING…' : 'AGREE & REGISTER'} <ArrowRight size={15}/></button></div>
+        </form>
+      </div>}
+      <section className="playerPanel">
+        <div className="playerPanelHeading"><div><p className="eyebrow">PLAYER IDENTITY / AGE 18+</p><h2>IDENTITY <span className="ember">CHECK.</span></h2></div><ShieldCheck size={22}/></div>
+        <div className="playerIdentityStatus"><span className={'adminStatusPill ' + (kyc.status === 'APPROVED' ? 'adminStatusLive' : '')}>{String(kyc.status || 'NOT_SUBMITTED').replaceAll('_', ' ')}</span><span>{kyc.ageVerified ? 'Age verified by staff.' : 'Age will be checked by staff from your Aadhaar image.'}</span>{kyc.reviewNote && <small>{kyc.reviewNote}</small>}</div>
+        {kyc.status !== 'APPROVED' && <form className="playerIdentityForm" onSubmit={submitKyc}>
+          <label>SELFIE PHOTO<input type="file" accept="image/jpeg,image/png" onChange={(event) => setKycImage('selfie', event.target.files?.[0])} required /></label>
+          <label>MASKED AADHAAR CARD PHOTO<input type="file" accept="image/jpeg,image/png" onChange={(event) => setKycImage('aadhaarImage', event.target.files?.[0])} required /><small>Hide the first 8 digits before uploading. JPEG/PNG, up to 2 MB.</small></label>
+          <label className="playerKycConsent"><input type="checkbox" checked={kycForm.consent} onChange={(event) => setKycForm({ ...kycForm, consent: event.target.checked })} required /><span>I consent to ApexNova using these images only for identity and age verification. They are encrypted, visible only to authorized reviewers, and deleted after review.</span></label>
+          <button className="primaryButton" type="submit" disabled={busy || !KYC_UPLOADS_ENABLED}>{busy ? 'SUBMITTING…' : 'SEND FOR ADMIN REVIEW'} <ArrowRight size={15}/></button>
+          {!KYC_UPLOADS_ENABLED && <small className="fieldNote warning">Secure identity storage is not configured on this deployment yet.</small>}
+        </form>}
+      </section>
+
+      <section className="playerPanel">
+        <div className="playerPanelHeading"><div><p className="eyebrow">APPROVED PRIZE BALANCE</p><h2>YOUR <span className="ember">WALLET.</span></h2></div><Wallet size={22}/></div>
+        <div className="playerWalletSummary"><div><small>AVAILABLE TO WITHDRAW</small><strong>{money(wallet.balance)}</strong><p>Only staff-approved tournament prizes are credited. Entry payments are made per tournament by UPI QR.</p></div><span className="playerLiveTag">PRIZE LEDGER</span></div>
+        {kyc.status === 'APPROVED' ? <form className="playerWithdrawalForm" onSubmit={requestWithdrawal}><label>WITHDRAWAL AMOUNT (₹)<input type="number" min="1" max="1000000" step="1" value={withdrawForm.amount} onChange={(event) => setWithdrawForm({ ...withdrawForm, amount: event.target.value })} required /></label><label>PAYOUT METHOD<select value={withdrawForm.method} onChange={(event) => setWithdrawForm({ ...withdrawForm, method: event.target.value })}><option value="UPI">UPI</option><option value="BANK">BANK ACCOUNT</option></select></label>{withdrawForm.method === 'UPI' ? <label>YOUR UPI ID<input value={withdrawForm.upiVpa} onChange={(event) => setWithdrawForm({ ...withdrawForm, upiVpa: event.target.value })} placeholder="name@bank" minLength={5} maxLength={100} required /></label> : <><label>ACCOUNT HOLDER NAME<input value={withdrawForm.accountName} onChange={(event) => setWithdrawForm({ ...withdrawForm, accountName: event.target.value })} minLength={2} maxLength={100} required /></label><label>BANK ACCOUNT NUMBER<input inputMode="numeric" value={withdrawForm.accountNumber} onChange={(event) => setWithdrawForm({ ...withdrawForm, accountNumber: event.target.value })} minLength={6} maxLength={34} pattern="[0-9]+" required /></label><label>IFSC CODE<input value={withdrawForm.ifsc} onChange={(event) => setWithdrawForm({ ...withdrawForm, ifsc: event.target.value.toUpperCase() })} minLength={11} maxLength={11} pattern="[A-Za-z]{4}0[A-Za-z0-9]{6}" required /></label></>}<button className="primaryButton" type="submit" disabled={busy || Number(wallet.balance) <= 0}>{busy ? 'SENDING…' : 'REQUEST PAYOUT'} <ArrowRight size={15}/></button></form> : <p className="playerPanelFoot"><ShieldCheck size={15}/> Approved identity and age verification is required before prize withdrawals.</p>}
+        <div className="playerWalletLedger">{(wallet.transactions || []).map((tx) => <div className="ledgerRow" key={tx.id}><div className="ledgerIcon"><CircleDollarSign size={17}/></div><div className="ledgerMain"><strong>{String(tx.type).replaceAll('_', ' ')}</strong><small>{tx.status} · {new Date(tx.createdAt).toLocaleString('en-IN')}</small></div><strong className={tx.type === 'WITHDRAWAL' ? 'negativeAmount' : 'positiveAmount'}>{tx.type === 'WITHDRAWAL' ? '−' : '+'}{money(tx.amount)}</strong></div>)}{!(wallet.transactions || []).length && <div className="playerEmpty">NO PRIZE OR PAYOUT TRANSACTIONS YET.</div>}</div>
       </section>
       <footer className="playerFooter">APEX NOVA · RISE. DOMINATE. CONQUER. <span>Account and tournament data are API-backed. Payments remain disabled.</span></footer>
     </main>

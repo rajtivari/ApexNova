@@ -31,13 +31,17 @@ export default function AdminPage() {
   const [teams, setTeams] = useState([]);
   const [matches, setMatches] = useState([]);
   const [registrations, setRegistrations] = useState([]);
+  const [kycRows, setKycRows] = useState([]);
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [kycPreview, setKycPreview] = useState(null);
+  const [prizeForm, setPrizeForm] = useState({ resultId: '', amount: '' });
   const [staffForm, setStaffForm] = useState({ displayName: '', email: '', password: '', role: 'WORKER' });
   const [matchForm, setMatchForm] = useState({ tournamentId: '', round: 'Round 1', scheduledAt: '', roomId: '', roomPassword: '' });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [form, setForm] = useState({ name: '', game: 'FREE_FIRE', format: 'BATTLE_ROYALE', entryFee: '0', prizePool: '5000', startsAt: '', registrationClosesAt: '' });
+  const [form, setForm] = useState({ name: '', game: 'FREE_FIRE', format: 'BATTLE_ROYALE', entryFee: '0', prizePool: '5000', startsAt: '', registrationClosesAt: '', rules: '' });
 
   const load = useCallback(async (current) => {
     if (!current?.accessToken || current.role !== 'SUPER_ADMIN') { setLoading(false); return; }
@@ -54,10 +58,16 @@ export default function AdminPage() {
       const registrationGroups = await Promise.all((Array.isArray(events) ? events : []).map(async (event) => {
         try {
           const rows = await api('/api/tournaments/' + event.id + '/registrations', current.accessToken);
-          return (Array.isArray(rows) ? rows : []).map((row) => ({ ...row, tournamentName: event.name, tournamentId: event.id }));
+          return (Array.isArray(rows) ? rows : []).map((row) => ({ ...row, tournamentName: event.name, tournamentId: event.id, entryFee: event.entryFee }));
         } catch { return []; }
       }));
       setRegistrations(registrationGroups.flat());
+      const [identityRows, payoutRows] = await Promise.all([
+        api('/api/kyc/admin', current.accessToken).catch(() => []),
+        api('/api/wallet/pending', current.accessToken).catch(() => []),
+      ]);
+      setKycRows(Array.isArray(identityRows) ? identityRows : []);
+      setWithdrawals(Array.isArray(payoutRows) ? payoutRows : []);
     } catch (err) { setError(err.message || 'Unable to load admin data.'); }
     finally { setLoading(false); }
   }, []);
@@ -72,16 +82,16 @@ export default function AdminPage() {
 
   async function createTournament(event) {
     event.preventDefault(); setError(''); setMessage('');
-    if (!form.name.trim() || !form.startsAt || !form.registrationClosesAt) return setError('Complete the name, start time, and registration deadline.');
+    if (!form.name.trim() || !form.startsAt || !form.registrationClosesAt || form.rules.trim().length < 10) return setError('Complete the name, tournament rules, start time, and registration deadline.');
     const startsAt = new Date(form.startsAt);
     const registrationClosesAt = new Date(form.registrationClosesAt);
     if (registrationClosesAt >= startsAt) return setError('Registration must close before the tournament starts.');
     if (startsAt <= new Date()) return setError('Choose a future tournament start time.');
     setBusy(true);
     try {
-      const created = await api('/api/tournaments', session.accessToken, { method: 'POST', body: JSON.stringify({ name: form.name.trim(), game: form.game, format: form.format, entryFee: Number(form.entryFee), prizePool: Number(form.prizePool), startsAt: startsAt.toISOString(), registrationClosesAt: registrationClosesAt.toISOString() }) });
+      const created = await api('/api/tournaments', session.accessToken, { method: 'POST', body: JSON.stringify({ name: form.name.trim(), game: form.game, format: form.format, entryFee: Number(form.entryFee), prizePool: Number(form.prizePool), startsAt: startsAt.toISOString(), registrationClosesAt: registrationClosesAt.toISOString(), rules: form.rules.trim() }) });
       setMessage('Tournament created as DRAFT. Publish it, then open registration when ready.');
-      setForm({ name: '', game: 'FREE_FIRE', format: 'BATTLE_ROYALE', entryFee: '0', prizePool: '5000', startsAt: '', registrationClosesAt: '' });
+      setForm({ name: '', game: 'FREE_FIRE', format: 'BATTLE_ROYALE', entryFee: '0', prizePool: '5000', startsAt: '', registrationClosesAt: '', rules: '' });
       await load(session);
     } catch (err) { setError(err.message || 'Could not create tournament.'); }
     finally { setBusy(false); }
@@ -115,6 +125,57 @@ export default function AdminPage() {
       await load(session);
     } catch (err) { setError(err.message || 'Could not schedule match.'); }
     finally { setBusy(false); }
+  }
+
+  async function reviewPayment(row, status) {
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/tournaments/' + row.tournamentId + '/registrations/' + row.id + '/payment', session.accessToken, { method: 'PATCH', body: JSON.stringify({ status }) });
+      setMessage('Entry payment ' + status.toLowerCase() + '.');
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not review the entry payment.'); }
+    finally { setBusy(false); }
+  }
+
+  async function reviewKyc(row, status) {
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/kyc/' + row.userId + '/review', session.accessToken, { method: 'PATCH', body: JSON.stringify({ status, ...(status === 'REJECTED' ? { note: 'Please resubmit clear identity images.' } : {}) }) });
+      setMessage('Identity and age check ' + status.toLowerCase() + '.');
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not review identity verification.'); }
+    finally { setBusy(false); }
+  }
+
+  async function reviewWithdrawal(row, status) {
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/wallet/withdrawals/' + row.id, session.accessToken, { method: 'PATCH', body: JSON.stringify({ status }) });
+      setMessage(status === 'PAID' ? 'Payout marked paid. Send the transfer to the shown payout destination before confirming.' : 'Payout rejected and prize balance returned.');
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not review payout.'); }
+    finally { setBusy(false); }
+  }
+
+  async function awardPrize(event) {
+    event.preventDefault(); setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/wallet/prizes', session.accessToken, { method: 'POST', body: JSON.stringify({ resultId: prizeForm.resultId, amount: Number(prizeForm.amount) }) });
+      setPrizeForm({ resultId: '', amount: '' });
+      setMessage('Prize credited to the team captain’s wallet.');
+      await load(session);
+    } catch (err) { setError(err.message || 'Could not credit the prize.'); }
+    finally { setBusy(false); }
+  }
+
+  async function viewKycDocument(row, kind) {
+    setError('');
+    try {
+      const response = await fetch(API_BASE_URL + '/api/kyc/' + row.userId + '/documents/' + kind, { headers: { Authorization: 'Bearer ' + session.accessToken } });
+      if (!response.ok) throw new Error('Document is unavailable or secure storage is not configured.');
+      const url = URL.createObjectURL(await response.blob());
+      setKycPreview((current) => { if (current?.url) URL.revokeObjectURL(current.url); return { url, kind, name: row.user?.profile?.displayName || row.user?.email }; });
+    } catch (err) { setError(err.message || 'Could not open the verification image.'); }
   }
 
   async function reviewRegistration(row, status) {
@@ -184,6 +245,7 @@ export default function AdminPage() {
           <label className="adminField">ENTRY FEE (₹)<input type="number" min="0" max="1000000" step="1" value={form.entryFee} onChange={(e) => setForm({ ...form, entryFee: e.target.value })} required/></label>
           <label className="adminField">PRIZE POOL (₹)<input type="number" min="0" max="100000000" step="1" value={form.prizePool} onChange={(e) => setForm({ ...form, prizePool: e.target.value })} required/></label>
           <label className="adminField">MATCH START<input type="datetime-local" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} required/></label>
+          <label className="adminField adminFieldWide">TOURNAMENT RULES<textarea value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })} minLength={10} maxLength={5000} rows={5} placeholder="Explain match rules, fair-play requirements, roster limits, check-in, and dispute timing." required/></label>
           <label className="adminField">REGISTRATION CLOSES<input type="datetime-local" value={form.registrationClosesAt} onChange={(e) => setForm({ ...form, registrationClosesAt: e.target.value })} required/></label>
           <div className="adminFormNote"><ShieldCheck size={16}/> New events are saved as DRAFT. Paid entry is not activated by this form.</div>
           <button className="primaryButton adminFormSubmit" type="submit" disabled={busy}>{busy ? 'SAVING EVENT…' : 'CREATE DRAFT TOURNAMENT'} <ArrowRight size={16}/></button>
@@ -204,7 +266,7 @@ export default function AdminPage() {
 
       <section className="playerPanel">
         <div className="playerPanelHeading"><div><p className="eyebrow">SQUAD APPROVAL QUEUE</p><h2>TEAM <span className="ember">REGISTRATIONS.</span></h2></div><Users size={22}/></div>
-        {registrations.filter((row) => row.status === 'PENDING').length === 0 ? <div className="playerEmpty">NO PENDING REGISTRATIONS.</div> : <div className="adminTournamentList">{registrations.filter((row) => row.status === 'PENDING').map((row) => <article className="adminTournamentRow" key={row.id}><div className="adminTournamentIdentity"><span className="adminTournamentGlyph"><Users size={20}/></span><div><h3>{row.team?.name || 'Unknown squad'}</h3><p>{row.tournamentName} · Captain: {row.team?.captain?.profile?.displayName || row.team?.captain?.email || 'Unknown'}</p><small className="adminId">Registration {row.id}</small></div></div><div className="adminTournamentActions"><button className="secondaryButton" disabled={busy} onClick={() => reviewRegistration(row, 'APPROVED')}>APPROVE</button><button className="secondaryButton" disabled={busy} onClick={() => reviewRegistration(row, 'REJECTED')}>REJECT</button></div></article>)}</div>}
+        {registrations.filter((row) => row.status === 'PENDING').length === 0 ? <div className="playerEmpty">NO PENDING REGISTRATIONS.</div> : <div className="adminTournamentList">{registrations.filter((row) => row.status === 'PENDING').map((row) => <article className="adminTournamentRow" key={row.id}><div className="adminTournamentIdentity"><span className="adminTournamentGlyph"><Users size={20}/></span><div><h3>{row.team?.name || 'Unknown squad'}</h3><p>{row.tournamentName} · Captain: {row.team?.captain?.profile?.displayName || row.team?.captain?.email || 'Unknown'}</p><small className="adminId">In-game: {row.inGameName || 'Not provided'} · UID: {row.gameUid || 'Not provided'} · Rules accepted: {row.rulesAcceptedAt ? new Date(row.rulesAcceptedAt).toLocaleString('en-IN') : '—'}</small>{Number(row.entryFee || 0) > 0 && <small className="adminId">UPI reference: {row.paymentReference || '—'} · Payment: {row.paymentStatus}</small>}</div></div><div className="adminTournamentActions">{row.paymentStatus === 'PENDING' && <><button className="secondaryButton" disabled={busy} onClick={() => reviewPayment(row, 'VERIFIED')}>VERIFY PAYMENT</button><button className="secondaryButton" disabled={busy} onClick={() => reviewPayment(row, 'REJECTED')}>REJECT PAYMENT</button></>}<button className="secondaryButton" disabled={busy || (Number(row.entryFee || 0) > 0 && row.paymentStatus !== 'VERIFIED')} onClick={() => reviewRegistration(row, 'APPROVED')}>APPROVE</button><button className="secondaryButton" disabled={busy} onClick={() => reviewRegistration(row, 'REJECTED')}>REJECT</button></div></article>)}</div>}
       </section>
 
       <section className="playerPanel">
@@ -237,6 +299,29 @@ export default function AdminPage() {
           <button className="primaryButton adminFormSubmit" type="submit" disabled={busy}>{busy ? 'CREATING ACCOUNT…' : 'CREATE ACCOUNT'} <ArrowRight size={16}/></button>
         </form>
       </section>
+      <section className="playerPanel">
+        <div className="playerPanelHeading"><div><p className="eyebrow">IDENTITY / AGE CHECK</p><h2>VERIFY <span className="ember">PLAYERS.</span></h2></div><ShieldCheck size={22}/></div>
+        {kycRows.filter((row) => row.status === 'PENDING').length === 0 ? <div className="playerEmpty">NO IDENTITY CHECKS WAITING.</div> : <div className="adminTournamentList">{kycRows.filter((row) => row.status === 'PENDING').map((row) => <article className="adminTournamentRow" key={row.userId}><div className="adminTournamentIdentity"><span className="adminTournamentGlyph"><ShieldCheck size={20}/></span><div><h3>{row.user?.profile?.displayName || row.user?.email || row.userId}</h3><p>{row.user?.email}</p><small className="adminId">Check age 18+ from the Aadhaar image and confirm both images match. Aadhaar number should be masked.</small></div></div><div className="adminTournamentActions"><button className="secondaryButton" disabled={busy || !row.hasSelfie} onClick={() => viewKycDocument(row, 'selfie')}>VIEW SELFIE</button><button className="secondaryButton" disabled={busy || !row.hasAadhaarImage} onClick={() => viewKycDocument(row, 'aadhaar')}>VIEW ID</button><button className="secondaryButton" disabled={busy} onClick={() => reviewKyc(row, 'APPROVED')}>APPROVE</button><button className="secondaryButton" disabled={busy} onClick={() => reviewKyc(row, 'REJECTED')}>REJECT</button></div></article>)}</div>}
+        <p className="playerPanelFoot"><ShieldCheck size={15}/> Documents are encrypted at rest and accessible to authorized staff only. Review only for identity and age.</p>
+      </section>
+
+      <section className="playerPanel">
+        <div className="playerPanelHeading"><div><p className="eyebrow">PRIZE OPERATIONS</p><h2>CREDIT <span className="ember">WALLET.</span></h2></div><Wallet size={22}/></div>
+        <form className="adminTournamentForm" onSubmit={awardPrize}>
+          <label className="adminField adminFieldWide">APPROVED MATCH RESULT<select value={prizeForm.resultId} onChange={(e) => setPrizeForm({ ...prizeForm, resultId: e.target.value })} required><option value="">Choose approved result</option>{matches.flatMap((match) => (match.results || []).filter((result) => result.status === 'APPROVED').map((result) => <option key={result.id} value={result.id}>{match.round} · team {result.teamId} · place {result.placement} · {result.totalPoints} pts</option>))}</select></label>
+          <label className="adminField">PRIZE AMOUNT (₹)<input type="number" min="1" step="1" value={prizeForm.amount} onChange={(e) => setPrizeForm({ ...prizeForm, amount: e.target.value })} required /></label>
+          <div className="adminFormNote"><ShieldCheck size={16}/> Prize is credited to the registered team captain. Credits are capped at the tournament prize pool and cannot be duplicated for one result.</div>
+          <button className="primaryButton adminFormSubmit" type="submit" disabled={busy || !prizeForm.resultId}>{busy ? 'CREDITING…' : 'CREDIT PRIZE'} <ArrowRight size={16}/></button>
+        </form>
+      </section>
+
+      <section className="playerPanel">
+        <div className="playerPanelHeading"><div><p className="eyebrow">PAYOUT REVIEW</p><h2>WALLET <span className="ember">WITHDRAWALS.</span></h2></div><Wallet size={22}/></div>
+        {withdrawals.length === 0 ? <div className="playerEmpty">NO PAYOUT REQUESTS WAITING.</div> : <div className="adminTournamentList">{withdrawals.map((row) => <article className="adminTournamentRow" key={row.id}><div className="adminTournamentIdentity"><span className="adminTournamentGlyph"><Wallet size={20}/></span><div><h3>{money(row.amount)} · {row.user?.profile?.displayName || row.user?.email}</h3><p>{row.payoutMethod === 'BANK' ? 'Bank transfer' : 'UPI'} · Send to {row.payoutDestination}</p><small className="adminId">Requested {new Date(row.createdAt).toLocaleString('en-IN')}</small></div></div><div className="adminTournamentActions"><button className="secondaryButton" disabled={busy} onClick={() => reviewWithdrawal(row, 'PAID')}>MARK PAID</button><button className="secondaryButton" disabled={busy} onClick={() => reviewWithdrawal(row, 'REJECTED')}>REJECT & REFUND</button></div></article>)}</div>}
+        <p className="playerPanelFoot"><ShieldCheck size={15}/> Send the payout first, then mark it paid. Rejections release the reserved wallet balance.</p>
+      </section>
+
+      {kycPreview && <div className="kycPreviewBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { URL.revokeObjectURL(kycPreview.url); setKycPreview(null); } }}><div className="kycPreviewPanel" role="dialog" aria-modal="true"><div className="playerPanelHeading"><div><p className="eyebrow">PRIVATE REVIEW IMAGE</p><h2>{kycPreview.name} · {kycPreview.kind}</h2></div><button className="secondaryButton" onClick={() => { URL.revokeObjectURL(kycPreview.url); setKycPreview(null); }}>CLOSE</button></div><img src={kycPreview.url} alt={kycPreview.kind === 'selfie' ? 'Player selfie for identity review' : 'Masked Aadhaar image for identity and age review'} /></div></div>}
       <footer className="playerFooter">APEX NOVA / ADMIN <span>{session.email} · Financial operations are intentionally disabled until verified payment and payout providers are configured.</span></footer>
     </main>
   );

@@ -12,6 +12,7 @@ const tournamentSchema = z.object({
   prizePool: z.number().finite().nonnegative().max(100_000_000).default(0),
   startsAt: z.coerce.date(),
   registrationClosesAt: z.coerce.date(),
+  rules: z.string().trim().min(10).max(5000),
 }).refine((data) => data.registrationClosesAt < data.startsAt, {
   message: 'Registration must close before the tournament starts',
   path: ['registrationClosesAt'],
@@ -30,7 +31,13 @@ const statusSchema = z.object({
     'CANCELLED',
   ]),
 });
-const registrationSchema = z.object({ teamId: z.string().min(1) });
+const registrationSchema = z.object({
+  teamId: z.string().min(1),
+  gameUid: z.string().trim().min(3).max(40).regex(/^[A-Za-z0-9._-]+$/),
+  inGameName: z.string().trim().min(2).max(40),
+  rulesAccepted: z.literal(true),
+  paymentReference: z.string().trim().min(8).max(40).regex(/^[A-Za-z0-9]+$/).optional(),
+});
 const registrationReviewSchema = z.object({ status: z.enum(['APPROVED', 'REJECTED']) });
 
 const allowedTransitions = {
@@ -55,6 +62,7 @@ router.get('/', async (req, res) => {
       prizePool: true,
       startsAt: true,
       registrationClosesAt: true,
+      rules: true,
       _count: { select: { registrations: true, matches: true } },
     },
     orderBy: { startsAt: 'asc' },
@@ -114,14 +122,21 @@ router.post('/:id/register', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) =>
   const prisma = req.app.locals.prisma;
   const tournament = await prisma.tournament.findUnique({
     where: { id: req.params.id },
-    select: { id: true, status: true, startsAt: true, registrationClosesAt: true, entryFee: true },
+    select: { id: true, status: true, startsAt: true, registrationClosesAt: true, entryFee: true, rules: true },
   });
   if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
   if (tournament.status !== 'REGISTRATION_OPEN' || tournament.registrationClosesAt <= new Date()) {
     return res.status(409).json({ error: 'Tournament registration is closed' });
   }
-  if (Number(tournament.entryFee) > 0) {
-    return res.status(503).json({ error: 'Paid registration is disabled until a verified payment provider is configured' });
+  if (!tournament.rules?.trim()) return res.status(409).json({ error: 'Tournament rules are not configured yet' });
+  const isPaid = Number(tournament.entryFee) > 0;
+  if (isPaid && (process.env.PAYMENTS_ENABLED !== 'true' || !process.env.ESPORTS_REGISTRATION_ID || !process.env.UPI_QR_URL)) {
+    return res.status(503).json({ error: 'Paid registration is not configured for this tournament platform' });
+  }
+  if (isPaid && !input.paymentReference) return res.status(400).json({ error: 'Enter the UPI transaction reference after paying the entry fee' });
+  if (isPaid) {
+    const kyc = await prisma.kyc.findUnique({ where: { userId: req.user.id }, select: { status: true } });
+    if (kyc?.status !== 'APPROVED') return res.status(403).json({ error: 'Complete approved identity and age verification before paid registration' });
   }
 
   const team = await prisma.team.findUnique({
@@ -134,14 +149,14 @@ router.post('/:id/register', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) =>
   try {
     const registration = await prisma.$transaction(async (tx) => {
       const created = await tx.tournamentRegistration.create({
-        data: { tournamentId: tournament.id, teamId: team.id, status: 'PENDING' },
+        data: { tournamentId: tournament.id, teamId: team.id, status: 'PENDING', paymentStatus: isPaid ? 'PENDING' : 'NOT_REQUIRED', paymentReference: isPaid ? input.paymentReference : null, gameUid: input.gameUid, inGameName: input.inGameName, rulesAcceptedAt: new Date() },
       });
       await logAction(tx, {
         actorId: req.user.id,
         action: 'TOURNAMENT_REGISTRATION_SUBMITTED',
         entity: 'TournamentRegistration',
         entityId: created.id,
-        metadata: { tournamentId: tournament.id, teamId: team.id },
+        metadata: { tournamentId: tournament.id, teamId: team.id, paidEntry: isPaid, ...(isPaid ? { paymentReference: input.paymentReference } : {}) },
       });
       return created;
     });
@@ -178,12 +193,39 @@ router.get('/:id/registrations', roleGuard('SUPER_ADMIN', 'WORKER'), async (req,
   return res.json(registrations);
 });
 
+router.patch('/:id/registrations/:registrationId/payment', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => {
+  const input = z.object({ status: z.enum(['VERIFIED', 'REJECTED']) }).parse(req.body);
+  const prisma = req.app.locals.prisma;
+  const registration = await prisma.tournamentRegistration.findFirst({
+    where: { id: req.params.registrationId, tournamentId: req.params.id },
+    include: { tournament: { select: { entryFee: true } } },
+  });
+  if (!registration) return res.status(404).json({ error: 'Registration not found' });
+  if (Number(registration.tournament.entryFee) <= 0 || !registration.paymentReference) return res.status(409).json({ error: 'This registration has no paid entry to verify' });
+  if (registration.paymentStatus !== 'PENDING') return res.status(409).json({ error: 'Payment has already been reviewed' });
+  const updated = await prisma.$transaction(async (tx) => {
+    const changed = await tx.tournamentRegistration.update({
+      where: { id: registration.id },
+      data: { paymentStatus: input.status, paymentReviewedAt: new Date() },
+    });
+    await logAction(tx, {
+      actorId: req.user.id,
+      action: 'ENTRY_PAYMENT_' + input.status,
+      entity: 'TournamentRegistration',
+      entityId: changed.id,
+      metadata: { tournamentId: req.params.id, paymentReference: registration.paymentReference },
+    });
+    return changed;
+  });
+  return res.json(updated);
+});
+
 router.patch('/:id/registrations/:registrationId', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => {
   const input = registrationReviewSchema.parse(req.body);
   const prisma = req.app.locals.prisma;
   const registration = await prisma.tournamentRegistration.findFirst({
     where: { id: req.params.registrationId, tournamentId: req.params.id },
-    include: { tournament: { select: { status: true } } },
+    include: { tournament: { select: { status: true, entryFee: true } } },
   });
   if (!registration) return res.status(404).json({ error: 'Registration not found' });
   if (!['REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(registration.tournament.status)) {
@@ -191,6 +233,9 @@ router.patch('/:id/registrations/:registrationId', roleGuard('SUPER_ADMIN', 'WOR
   }
   if (registration.status !== 'PENDING') {
     return res.status(409).json({ error: 'Registration has already been reviewed' });
+  }
+  if (input.status === 'APPROVED' && Number(registration.tournament.entryFee || 0) > 0 && registration.paymentStatus !== 'VERIFIED') {
+    return res.status(409).json({ error: 'Verify the UPI payment before approving this registration' });
   }
 
   const updated = await prisma.$transaction(async (tx) => {
