@@ -7,12 +7,18 @@ import { logAction } from '../utils/auditLog.js';
 const router = Router();
 const withdrawSchema = z.object({
   amount: z.number().finite().positive().max(1_000_000),
-  upiVpa: z.string().trim().min(5).max(100).regex(/^[A-Za-z0-9._-]{2,64}@[A-Za-z0-9.-]{2,64}$/),
+  method: z.enum(['UPI', 'BANK']),
+  upiVpa: z.string().trim().min(5).max(100).regex(/^[A-Za-z0-9._-]{2,64}@[A-Za-z0-9.-]{2,64}$/).optional(),
+  accountName: z.string().trim().min(2).max(100).optional(),
+  accountNumber: z.string().trim().min(6).max(34).regex(/^[0-9]+$/).optional(),
+  ifsc: z.string().trim().toUpperCase().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/).optional(),
+}).superRefine((value, ctx) => {
+  if (value.method === 'UPI' && !value.upiVpa) ctx.addIssue({ code: 'custom', path: ['upiVpa'], message: 'Enter a valid UPI ID' });
+  if (value.method === 'BANK' && (!value.accountName || !value.accountNumber || !value.ifsc)) ctx.addIssue({ code: 'custom', path: ['method'], message: 'Enter the account holder, account number, and IFSC' });
 });
-const maskVpa = (value) => {
-  const [name, domain] = value.split('@');
-  return (name.slice(0, 2) + '***@' + domain);
-};
+const maskDestination = (input) => input.method === 'UPI'
+  ? input.upiVpa.split('@')[0].slice(0, 2) + '***@' + input.upiVpa.split('@')[1]
+  : input.accountName + ' · account ending ' + input.accountNumber.slice(-4) + ' · ' + input.ifsc;
 
 router.get('/me', async (req, res) => {
   const prisma = req.app.locals.prisma;
@@ -47,8 +53,9 @@ router.post('/withdraw', async (req, res) => {
         userId: req.user.id,
         transactionId: transaction.id,
         amount: input.amount,
-        encryptedDestination: encryptText(input.upiVpa),
-        maskedDestination: maskVpa(input.upiVpa),
+        encryptedDestination: encryptText(JSON.stringify(input.method === 'UPI' ? { method: input.method, upiVpa: input.upiVpa } : { method: input.method, accountName: input.accountName, accountNumber: input.accountNumber, ifsc: input.ifsc })),
+        destinationType: input.method,
+        maskedDestination: maskDestination(input),
       },
       select: { id: true, amount: true, maskedDestination: true, status: true, createdAt: true },
     });
@@ -73,8 +80,8 @@ router.get('/pending', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => {
     orderBy: { createdAt: 'asc' },
   });
   return res.json(rows.map((row) => ({
-    id: row.id, amount: row.amount, maskedDestination: row.maskedDestination,
-    payoutDestination: decryptText(row.encryptedDestination), createdAt: row.createdAt,
+    id: row.id, amount: row.amount, maskedDestination: row.maskedDestination, payoutMethod: row.destinationType,
+    payoutDestination: (() => { const destination = JSON.parse(decryptText(row.encryptedDestination)); return destination.method === 'UPI' ? destination.upiVpa : destination.accountName + ' · ' + destination.accountNumber + ' · ' + destination.ifsc; })(), createdAt: row.createdAt,
     user: row.user,
   })));
 });
