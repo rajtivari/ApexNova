@@ -21,6 +21,8 @@ ALTER TABLE "Kyc"
   ALTER COLUMN "status" SET DEFAULT 'NOT_SUBMITTED',
   ADD COLUMN "selfieDocumentKey" TEXT,
   ADD COLUMN "aadhaarDocumentKey" TEXT,
+  ADD COLUMN "selfieMimeType" TEXT,
+  ADD COLUMN "aadhaarMimeType" TEXT,
   ADD COLUMN "dateOfBirth" TIMESTAMP(3),
   ADD COLUMN "reviewedAt" TIMESTAMP(3),
   ADD COLUMN "reviewedById" TEXT,
