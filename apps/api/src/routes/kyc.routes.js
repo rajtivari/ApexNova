@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile, chmod } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, chmod, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import { roleGuard } from '../middleware/auth.js';
@@ -55,6 +55,10 @@ async function writeEncrypted(name, bytes) {
   await writeFile(path.join(directory, documentKey), encryptBuffer(bytes), { flag: 'wx', mode: 0o600 });
   return documentKey;
 }
+async function removeEncrypted(documentKey) {
+  if (!documentKey || !/^[a-z-]+-[0-9a-f-]+\\.enc$/.test(documentKey)) return;
+  try { await unlink(path.join(storageDirectory(), documentKey)); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+}
 async function readEncrypted(documentKey) {
   if (!/^[a-z-]+-[0-9a-f-]+\.enc$/.test(documentKey)) throw new Error('Invalid document key');
   const bytes = await readFile(path.join(storageDirectory(), documentKey));
@@ -90,8 +94,8 @@ router.post('/me', async (req, res) => {
   const kyc = await prisma.kyc.upsert({
     where: { userId: req.user.id },
     create: { userId: req.user.id, selfieDocumentKey: selfieKey, aadhaarDocumentKey: aadhaarKey, selfieMimeType: input.selfie.mimeType, aadhaarMimeType: input.aadhaarImage.mimeType, dateOfBirth, status: 'PENDING' },
-    update: { selfieDocumentKey: selfieKey, aadhaarDocumentKey: aadhaarKey, selfieMimeType: input.selfie.mimeType, aadhaarMimeType: input.aadhaarImage.mimeType, dateOfBirth, status: 'PENDING', reviewedAt: null, reviewedById: null, reviewNote: null, encryptedAadhaar: null, maskedAadhaar: null },
-    select: { status: true, dateOfBirth: true, reviewedAt: true, reviewNote: true },
+    update: { selfieDocumentKey: selfieKey, aadhaarDocumentKey: aadhaarKey, selfieMimeType: input.selfie.mimeType, aadhaarMimeType: input.aadhaarImage.mimeType, dateOfBirth, status: 'PENDING', reviewedAt: null, reviewedById: null, reviewNote: null, ageVerified: false, encryptedAadhaar: null, maskedAadhaar: null },
+    select: { status: true, ageVerified: true, dateOfBirth: true, reviewedAt: true, reviewNote: true },
   });
   await logAction(prisma, { actorId: req.user.id, action: 'KYC_SUBMITTED', entity: 'Kyc', entityId: req.user.id, metadata: { documents: ['selfie', 'masked_aadhaar_image'] } });
   return res.status(202).json(kyc);
@@ -100,7 +104,7 @@ router.post('/me', async (req, res) => {
 router.get('/me', async (req, res) => {
   const kyc = await req.app.locals.prisma.kyc.findUnique({
     where: { userId: req.user.id },
-    select: { status: true, dateOfBirth: true, reviewedAt: true, reviewNote: true },
+    select: { status: true, ageVerified: true, dateOfBirth: true, reviewedAt: true, reviewNote: true },
   });
   return res.json(kyc || { status: 'NOT_SUBMITTED' });
 });
@@ -136,9 +140,21 @@ router.patch('/:userId/review', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, 
   if (input.status === 'REJECTED' && !input.note) return res.status(400).json({ error: 'Add a reason when rejecting verification' });
   const updated = await prisma.kyc.update({
     where: { userId: current.userId },
-    data: { status: input.status, reviewedAt: new Date(), reviewedById: req.user.id, reviewNote: input.note || null },
-    select: { userId: true, status: true, reviewedAt: true, reviewNote: true },
+    data: {
+      status: input.status,
+      ageVerified: input.status === 'APPROVED',
+      dateOfBirth: null,
+      selfieDocumentKey: null,
+      aadhaarDocumentKey: null,
+      selfieMimeType: null,
+      aadhaarMimeType: null,
+      reviewedAt: new Date(),
+      reviewedById: req.user.id,
+      reviewNote: input.note || null,
+    },
+    select: { userId: true, status: true, ageVerified: true, reviewedAt: true, reviewNote: true },
   });
+  await Promise.all([removeEncrypted(current.selfieDocumentKey), removeEncrypted(current.aadhaarDocumentKey)]);
   await logAction(prisma, { actorId: req.user.id, action: 'KYC_' + input.status, entity: 'Kyc', entityId: updated.userId });
   return res.json(updated);
 });
