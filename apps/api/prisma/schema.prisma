@@ -134,6 +134,7 @@ model WithdrawalRequest {
   transactionId String @unique
   amount Decimal
   encryptedDestination String
+  destinationType String @default("UPI")
   maskedDestination String
   status WithdrawalStatus @default(PENDING)
   createdAt DateTime @default(now())
