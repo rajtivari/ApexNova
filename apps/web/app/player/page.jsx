@@ -32,6 +32,8 @@ export default function PlayerPage() {
   const [matches, setMatches] = useState([]);
   const [teamName, setTeamName] = useState('');
   const [memberEmail, setMemberEmail] = useState('');
+  const [selectedTournament, setSelectedTournament] = useState(null);
+  const [joinForm, setJoinForm] = useState({ gameUid: '', inGameName: '', rulesAccepted: false });
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -103,13 +105,24 @@ export default function PlayerPage() {
       setError('Create a squad first. Tournament registration is captain-led.');
       return;
     }
+    if (!joinForm.gameUid.trim() || !joinForm.inGameName.trim() || !joinForm.rulesAccepted) {
+      setError('Enter your game UID and in-game name, then accept the tournament rules.');
+      return;
+    }
     setBusy(true); setError(''); setMessage('');
     try {
       await api('/api/tournaments/' + tournament.id + '/register', session.accessToken, {
         method: 'POST',
-        body: JSON.stringify({ teamId: team.id }),
+        body: JSON.stringify({
+          teamId: team.id,
+          gameUid: joinForm.gameUid.trim(),
+          inGameName: joinForm.inGameName.trim(),
+          rulesAccepted: joinForm.rulesAccepted,
+        }),
       });
-      setMessage('Registration submitted. Check the tournament status for staff approval.');
+      setMessage('Registration submitted. Your game ID and rules acceptance were recorded. Check the tournament status for staff approval.');
+      setSelectedTournament(null);
+      setJoinForm({ gameUid: '', inGameName: '', rulesAccepted: false });
       await load(session);
     } catch (err) {
       setError(err.message || 'Could not register this squad.');
@@ -211,7 +224,7 @@ export default function PlayerPage() {
             <div className="playerEventIcon"><Gamepad2 size={20}/></div>
             <div className="playerEventMain"><div className="playerEventMeta"><span>{event.game === 'FREE_FIRE' ? 'FREE FIRE' : event.game}</span><span>{String(event.status).replaceAll('_', ' ')}</span></div><h3>{event.name}</h3><p><CalendarDays size={14}/>{Number.isNaN(start.getTime()) ? 'Time to be announced' : start.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })} <b>·</b> {String(event.format).replaceAll('_', ' ')}</p></div>
             <div className="playerEventPrize"><small>PRIZE POOL</small><strong>{money(event.prizePool)}</strong><small>ENTRY {Number(event.entryFee || 0) === 0 ? 'FREE' : money(event.entryFee)}</small></div>
-            {canJoin ? <button className="secondaryButton playerJoinButton" onClick={() => joinTournament(event)} disabled={busy || !myTeam || myTeam.captain?.id !== profile?.id}>{myTeam?.captain?.id === profile?.id ? 'REGISTER SQUAD' : 'CAPTAIN ONLY'} <ArrowRight size={14}/></button> : <span className="playerEventStatus">{Number(event.entryFee || 0) > 0 ? 'PAID ENTRY DISABLED' : String(event.status).replaceAll('_', ' ')}</span>}
+            {canJoin ? <button className="secondaryButton playerJoinButton" onClick={() => { setSelectedTournament(event); setJoinForm({ gameUid: '', inGameName: '', rulesAccepted: false }); setError(''); setMessage(''); }} disabled={busy || !myTeam || myTeam.captain?.id !== profile?.id}>{myTeam?.captain?.id === profile?.id ? 'REGISTER SQUAD' : 'CAPTAIN ONLY'} <ArrowRight size={14}/></button> : <span className="playerEventStatus">{Number(event.entryFee || 0) > 0 ? 'PAID ENTRY DISABLED' : String(event.status).replaceAll('_', ' ')}</span>}
           </article>;
         })}</div>}
         <p className="playerPanelFoot"><CircleDollarSign size={15}/> Paid registration is deliberately blocked until a verified payment flow is deployed. No wallet balance is simulated here.</p>
@@ -226,6 +239,18 @@ export default function PlayerPage() {
         <div className="playerPanelHeading"><div><p className="eyebrow">PLAYER INBOX</p><h2>RECENT <span className="ember">UPDATES.</span></h2></div><Bell size={22}/></div>
         {notifications.length === 0 ? <div className="playerEmpty">NO NOTIFICATIONS YET.</div> : notifications.slice(0, 5).map((item) => <article className="playerNotification" key={item.id}><span className={item.readAt ? 'notificationDot read' : 'notificationDot'}/><div><strong>{item.title}</strong><p>{item.body}</p><small>{new Date(item.createdAt).toLocaleString('en-IN')}</small></div>{!item.readAt && <button className="secondaryButton" onClick={() => markRead(item)}>MARK READ</button>}</article>)}
       </section>
+      {selectedTournament && <div className="playerJoinBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setSelectedTournament(null); }}>
+        <form className="playerJoinModal" onSubmit={(event) => { event.preventDefault(); joinTournament(selectedTournament); }} role="dialog" aria-modal="true" aria-labelledby="joinTournamentTitle">
+          <div className="playerJoinHeading"><div><p className="eyebrow">REGISTRATION / {selectedTournament.game === 'FREE_FIRE' ? 'FREE FIRE' : selectedTournament.game}</p><h2 id="joinTournamentTitle">JOIN <span className="ember">{selectedTournament.name}</span></h2></div><button type="button" className="closeButton" aria-label="Close" onClick={() => setSelectedTournament(null)}>×</button></div>
+          <div className="playerRulesBox"><strong>TOURNAMENT RULES</strong><p>{selectedTournament.rules}</p></div>
+          <label className="playerJoinField">IN-GAME UID<input value={joinForm.gameUid} onChange={(event) => setJoinForm({ ...joinForm, gameUid: event.target.value })} minLength={3} maxLength={40} pattern="[A-Za-z0-9._-]+" placeholder="Your exact game UID" required /></label>
+          <label className="playerJoinField">IN-GAME NAME<input value={joinForm.inGameName} onChange={(event) => setJoinForm({ ...joinForm, inGameName: event.target.value })} minLength={2} maxLength={40} placeholder="Name shown in the game" required /></label>
+          <label className="playerRulesAccept"><input type="checkbox" checked={joinForm.rulesAccepted} onChange={(event) => setJoinForm({ ...joinForm, rulesAccepted: event.target.checked })} required /><span>I have read and agree to the tournament rules. My UID and in-game name are correct.</span></label>
+          <p className="playerJoinNote">Entry: {money(selectedTournament.entryFee)} · Registration will be sent for staff approval.</p>
+          {error && <div className="playerNotice playerNoticeError" role="alert">{error}</div>}
+          <div className="playerJoinActions"><button type="button" className="secondaryButton" onClick={() => setSelectedTournament(null)} disabled={busy}>CANCEL</button><button className="primaryButton" type="submit" disabled={busy}>{busy ? 'SUBMITTING…' : 'AGREE & REGISTER'} <ArrowRight size={15}/></button></div>
+        </form>
+      </div>}
       <footer className="playerFooter">APEX NOVA · RISE. DOMINATE. CONQUER. <span>Account and tournament data are API-backed. Payments remain disabled.</span></footer>
     </main>
   );
