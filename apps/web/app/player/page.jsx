@@ -179,16 +179,16 @@ export default function PlayerPage() {
 
   async function setKycImage(field, file) {
     setError('');
-    try { setKycForm((current) => ({ ...current, [field]: await readImage(file) })); }
+    try { const image = await readImage(file); setKycForm((current) => ({ ...current, [field]: image })); }
     catch (err) { setError(err.message); }
   }
 
   async function submitKyc(event) {
-    event.preventDefault(); setBusy(true); setError(''); setMessage('');
+    event.preventDefault(); const formElement = event.currentTarget; setBusy(true); setError(''); setMessage('');
     try {
       await api('/api/kyc/me', session.accessToken, { method: 'POST', body: JSON.stringify(kycForm) });
       setKycForm({ dateOfBirth: '', selfie: null, aadhaarImage: null, consent: false });
-      event.currentTarget.reset();
+      formElement.reset();
       setMessage('Identity and age documents sent for private staff review.');
       await load(session);
     } catch (err) { setError(err.message || 'Could not submit identity verification.'); }
@@ -296,12 +296,33 @@ export default function PlayerPage() {
           <div className="playerRulesBox"><strong>TOURNAMENT RULES</strong><p>{selectedTournament.rules}</p></div>
           <label className="playerJoinField">IN-GAME UID<input value={joinForm.gameUid} onChange={(event) => setJoinForm({ ...joinForm, gameUid: event.target.value })} minLength={3} maxLength={40} pattern="[A-Za-z0-9._-]+" placeholder="Your exact game UID" required /></label>
           <label className="playerJoinField">IN-GAME NAME<input value={joinForm.inGameName} onChange={(event) => setJoinForm({ ...joinForm, inGameName: event.target.value })} minLength={2} maxLength={40} placeholder="Name shown in the game" required /></label>
+          {Number(selectedTournament.entryFee || 0) > 0 && <div className="playerPaymentBox"><strong>PAY ENTRY BY UPI · {money(selectedTournament.entryFee)}</strong>{UPI_QR_URL ? <img src={UPI_QR_URL} alt="ApexNova UPI payment QR" /> : <p>UPI QR is not configured for this site yet.</p>}<label className="playerJoinField">UPI TRANSACTION REFERENCE<input value={joinForm.paymentReference} onChange={(event) => setJoinForm({ ...joinForm, paymentReference: event.target.value })} minLength={8} maxLength={40} pattern="[A-Za-z0-9]+" placeholder="Enter the UTR / transaction ID after payment" required /></label><small>Staff verify the reference against the payment before approving the squad.</small></div>}
+
           <label className="playerRulesAccept"><input type="checkbox" checked={joinForm.rulesAccepted} onChange={(event) => setJoinForm({ ...joinForm, rulesAccepted: event.target.checked })} required /><span>I have read and agree to the tournament rules. My UID and in-game name are correct.</span></label>
           <p className="playerJoinNote">Entry: {money(selectedTournament.entryFee)} · Registration will be sent for staff approval.</p>
           {error && <div className="playerNotice playerNoticeError" role="alert">{error}</div>}
           <div className="playerJoinActions"><button type="button" className="secondaryButton" onClick={() => setSelectedTournament(null)} disabled={busy}>CANCEL</button><button className="primaryButton" type="submit" disabled={busy}>{busy ? 'SUBMITTING…' : 'AGREE & REGISTER'} <ArrowRight size={15}/></button></div>
         </form>
       </div>}
+      <section className="playerPanel">
+        <div className="playerPanelHeading"><div><p className="eyebrow">PLAYER IDENTITY / AGE 18+</p><h2>IDENTITY <span className="ember">CHECK.</span></h2></div><ShieldCheck size={22}/></div>
+        <div className="playerIdentityStatus"><span className={'adminStatusPill ' + (kyc.status === 'APPROVED' ? 'adminStatusLive' : '')}>{String(kyc.status || 'NOT_SUBMITTED').replaceAll('_', ' ')}</span><span>{kyc.dateOfBirth ? 'Date of birth submitted for review.' : 'No date of birth submitted.'}</span>{kyc.reviewNote && <small>{kyc.reviewNote}</small>}</div>
+        {kyc.status !== 'APPROVED' && <form className="playerIdentityForm" onSubmit={submitKyc}>
+          <label>DATE OF BIRTH<input type="date" value={kycForm.dateOfBirth} onChange={(event) => setKycForm({ ...kycForm, dateOfBirth: event.target.value })} required /></label>
+          <label>SELFIE PHOTO<input type="file" accept="image/jpeg,image/png" onChange={(event) => setKycImage('selfie', event.target.files?.[0])} required /></label>
+          <label>MASKED AADHAAR CARD PHOTO<input type="file" accept="image/jpeg,image/png" onChange={(event) => setKycImage('aadhaarImage', event.target.files?.[0])} required /><small>Hide the first 8 digits before uploading. JPEG/PNG, up to 2 MB.</small></label>
+          <label className="playerKycConsent"><input type="checkbox" checked={kycForm.consent} onChange={(event) => setKycForm({ ...kycForm, consent: event.target.checked })} required /><span>I consent to ApexNova using these images and my date of birth only for identity and age verification. They are encrypted and visible to authorized reviewers only.</span></label>
+          <button className="primaryButton" type="submit" disabled={busy || !KYC_UPLOADS_ENABLED}>{busy ? 'SUBMITTING…' : 'SEND FOR ADMIN REVIEW'} <ArrowRight size={15}/></button>
+          {!KYC_UPLOADS_ENABLED && <small className="fieldNote warning">Secure identity storage is not configured on this deployment yet.</small>}
+        </form>}
+      </section>
+
+      <section className="playerPanel">
+        <div className="playerPanelHeading"><div><p className="eyebrow">APPROVED PRIZE BALANCE</p><h2>YOUR <span className="ember">WALLET.</span></h2></div><Wallet size={22}/></div>
+        <div className="playerWalletSummary"><div><small>AVAILABLE TO WITHDRAW</small><strong>{money(wallet.balance)}</strong><p>Only staff-approved tournament prizes are credited. Entry payments are made per tournament by UPI QR.</p></div><span className="playerLiveTag">PRIZE LEDGER</span></div>
+        {kyc.status === 'APPROVED' ? <form className="playerWithdrawalForm" onSubmit={requestWithdrawal}><label>WITHDRAWAL AMOUNT (₹)<input type="number" min="1" max="1000000" step="1" value={withdrawForm.amount} onChange={(event) => setWithdrawForm({ ...withdrawForm, amount: event.target.value })} required /></label><label>YOUR UPI ID<input value={withdrawForm.upiVpa} onChange={(event) => setWithdrawForm({ ...withdrawForm, upiVpa: event.target.value })} placeholder="name@bank" minLength={5} maxLength={100} required /></label><button className="primaryButton" type="submit" disabled={busy || Number(wallet.balance) <= 0}>{busy ? 'SENDING…' : 'REQUEST PAYOUT'} <ArrowRight size={15}/></button></form> : <p className="playerPanelFoot"><ShieldCheck size={15}/> Approved identity and age verification is required before prize withdrawals.</p>}
+        <div className="playerWalletLedger">{(wallet.transactions || []).map((tx) => <div className="ledgerRow" key={tx.id}><div className="ledgerIcon"><CircleDollarSign size={17}/></div><div className="ledgerMain"><strong>{String(tx.type).replaceAll('_', ' ')}</strong><small>{tx.status} · {new Date(tx.createdAt).toLocaleString('en-IN')}</small></div><strong className={tx.type === 'WITHDRAWAL' ? 'negativeAmount' : 'positiveAmount'}>{tx.type === 'WITHDRAWAL' ? '−' : '+'}{money(tx.amount)}</strong></div>)}{!(wallet.transactions || []).length && <div className="playerEmpty">NO PRIZE OR PAYOUT TRANSACTIONS YET.</div>}</div>
+      </section>
       <footer className="playerFooter">APEX NOVA · RISE. DOMINATE. CONQUER. <span>Account and tournament data are API-backed. Payments remain disabled.</span></footer>
     </main>
   );
