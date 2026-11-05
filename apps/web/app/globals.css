@@ -847,3 +847,39 @@ body { background:#02020c; color:#e8e8ff; font-family:'Exo 2','Space Grotesk',sa
 .playerJoinNote { color:#899691; font-size:11px; }
 .playerJoinActions { display:flex; justify-content:flex-end; gap:9px; margin-top:17px; }
 @media(max-width:520px) { .playerJoinBackdrop { padding:10px; align-items:end; }.playerJoinModal { padding:18px; max-height:94vh; }.playerJoinActions { flex-direction:column-reverse; }.playerJoinActions button { width:100%; justify-content:center; } }
+
+
+/* Wallet, payment confirmation, and private identity review panels. */
+.playerIdentityStatus { display:flex; align-items:center; flex-wrap:wrap; gap:12px; color:#9ba7a0; font-size:12px; margin-bottom:18px; }
+.playerIdentityStatus small { flex-basis:100%; color:#ff987e; }
+.playerIdentityForm,.playerWithdrawalForm { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:14px; }
+.playerIdentityForm>label,.playerWithdrawalForm>label { display:grid; gap:8px; color:#aab5b0; font:10px 'Share Tech Mono',monospace; letter-spacing:.06em; }
+.playerIdentityForm input:not([type=file]):not([type=checkbox]),.playerWithdrawalForm input { width:100%; min-height:42px; padding:10px; color:var(--bone); background:#080d0f; border:1px solid #344145; font:13px 'Space Grotesk',sans-serif; }
+.playerIdentityForm input[type=file] { width:100%; color:#aab5b0; font:11px 'Space Grotesk',sans-serif; }
+.playerIdentityForm label small { color:#73817a; font:10px 'Space Grotesk',sans-serif; line-height:1.5; letter-spacing:0; }
+.playerIdentityForm .playerKycConsent { grid-column:1/-1; display:flex; gap:10px; align-items:flex-start; padding:12px; background:#0b1113; border:1px solid #334044; color:#aab5b0; font:11px 'Space Grotesk',sans-serif; line-height:1.6; letter-spacing:0; }
+.playerKycConsent input { margin-top:3px; accent-color:var(--cyan); }
+.playerIdentityForm>button,.playerIdentityForm>.fieldNote { grid-column:1/-1; }
+.playerWalletSummary { display:flex; align-items:center; justify-content:space-between; gap:15px; padding:17px; border:1px solid #364345; background:linear-gradient(110deg,#101a1b,#0a1012); }
+.playerWalletSummary small { color:#778782; font:9px 'Share Tech Mono',monospace; }
+.playerWalletSummary strong { display:block; color:var(--cyan); font:800 38px 'Barlow Condensed',sans-serif; margin-top:6px; }
+.playerWalletSummary p { margin:5px 0 0; color:#899691; font-size:11px; line-height:1.5; }
+.playerWithdrawalForm { align-items:end; }
+.playerWithdrawalForm button { min-height:42px; }
+.playerWalletLedger { margin-top:18px; }
+.playerPaymentBox { margin:15px 0; padding:14px; border:1px solid #445052; background:#0a1012; display:grid; justify-items:center; gap:11px; }
+.playerPaymentBox>strong { color:var(--cyan); font:11px 'Share Tech Mono',monospace; text-align:center; }
+.playerPaymentBox>img { width:min(220px,100%); height:auto; background:white; padding:8px; }
+.playerPaymentBox>p,.playerPaymentBox>small { color:#909b95; font-size:11px; line-height:1.5; text-align:center; }
+.playerPaymentBox .playerJoinField { width:100%; margin:0; }
+.kycPreviewBackdrop { position:fixed; inset:0; z-index:110; display:grid; place-items:center; padding:20px; background:#03060bea; backdrop-filter:blur(7px); }
+.kycPreviewPanel { width:min(820px,100%); max-height:92vh; overflow:auto; padding:20px; background:#101719; border:1px solid #405052; }
+.kycPreviewPanel>img { display:block; max-width:100%; max-height:70vh; margin:10px auto 0; object-fit:contain; background:#050809; }
+.adminField textarea { width:100%; min-height:110px; padding:11px; resize:vertical; color:var(--bone); background:#080d0f; border:1px solid #344145; font:13px 'Space Grotesk',sans-serif; }
+.adminTournamentActions { flex-wrap:wrap; }
+@media(max-width:640px) {
+ .playerIdentityForm,.playerWithdrawalForm { grid-template-columns:1fr; }
+ .playerIdentityForm .playerKycConsent,.playerIdentityForm>button,.playerIdentityForm>.fieldNote { grid-column:auto; }
+ .playerWalletSummary { align-items:flex-start; flex-direction:column; }
+ .kycPreviewBackdrop { padding:8px; }
+}
