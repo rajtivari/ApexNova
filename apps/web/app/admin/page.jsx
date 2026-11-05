@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Activity, ArrowRight, CalendarDays, CheckCircle2, Crosshair, LogOut, Plus, RefreshCw, ShieldCheck, Swords, Trophy, Users } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, CheckCircle2, Gamepad2, LogOut, Plus, RefreshCw, ShieldCheck, Swords, Trophy, Users } from 'lucide-react';
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://apexnova-api.onrender.com').replace(/\/$/, '');
 const SESSION_KEY = 'apexnova-local-session-v1';
@@ -217,7 +217,7 @@ export default function AdminPage() {
   }
 
   if (loading && !session) return <main className="shell"><p className="eyebrow">VERIFYING ADMIN ACCESS…</p></main>;
-  if (!session || session.role !== 'SUPER_ADMIN') return <main className="shell localAccessDenied"><Crosshair size={32}/><p className="eyebrow">RESTRICTED OPERATIONS</p><h1>ADMIN ACCESS REQUIRED.</h1><p className="lede">This workspace requires a server-issued super-admin session. Sign in with an authorized account.</p><Link className="primaryButton" href="/login">GO TO SIGN IN <ArrowRight size={15}/></Link></main>;
+  if (!session || session.role !== 'SUPER_ADMIN') return <main className="shell localAccessDenied"><Gamepad2 size={32}/><p className="eyebrow">RESTRICTED OPERATIONS</p><h1>ADMIN ACCESS REQUIRED.</h1><p className="lede">This workspace requires a server-issued super-admin session. Sign in with an authorized account.</p><Link className="primaryButton" href="/login">GO TO SIGN IN <ArrowRight size={15}/></Link></main>;
 
   const live = tournaments.filter((item) => item.status === 'LIVE').length;
   const open = tournaments.filter((item) => item.status === 'REGISTRATION_OPEN').length;
@@ -225,7 +225,7 @@ export default function AdminPage() {
 
   return (
     <main className="shell playerDashboard adminDashboard">
-      <header className="topbar"><Link href="/" className="brand"><Crosshair size={24}/><span>APEX<span className="ember">NOVA</span></span></Link><span className="status"><i className="pulse"/> RESTRICTED OPERATIONS</span><button className="secondaryButton" onClick={signOut}><LogOut size={15}/> SIGN OUT</button></header>
+      <header className="topbar"><Link href="/" className="brand"><Gamepad2 size={24}/><span>APEX<span className="ember">NOVA</span></span></Link><span className="status"><i className="pulse"/> RESTRICTED OPERATIONS</span><button className="secondaryButton" onClick={signOut}><LogOut size={15}/> SIGN OUT</button></header>
       <section className="playerWelcome"><div><p className="eyebrow">APEX NOVA / ADMIN CONTROL</p><h1>RUN THE <span className="ember">ARENA.</span></h1><p className="lede">Manage published tournaments and monitor operational data. Sensitive actions remain enforced by the API.</p></div><button className="secondaryButton" onClick={() => load(session)} disabled={busy || loading}><RefreshCw size={15}/> REFRESH</button></section>
       {error && <div className="playerNotice playerNoticeError" role="alert">{error}</div>}
       {message && <div className="playerNotice playerNoticeSuccess" role="status"><CheckCircle2 size={17}/>{message}</div>}

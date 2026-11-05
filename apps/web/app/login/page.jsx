@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Crosshair, Eye, EyeOff, ShieldCheck, Trophy, Zap } from 'lucide-react';
+import { ArrowRight, Gamepad2, Eye, EyeOff, ShieldCheck, Trophy, Zap } from 'lucide-react';
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://apexnova-api.onrender.com').replace(/\/$/, '');
 const SESSION_KEY = 'apexnova-local-session-v1';
@@ -71,7 +71,7 @@ export default function LoginPage() {
     <main className="shell authShell">
       <header className="topbar">
         <button type="button" className="brand" onClick={() => window.location.assign('/ApexNova/')} aria-label="APEX NOVA home">
-          <Crosshair size={24} /><span>APEX<span className="ember">NOVA</span></span>
+          <Gamepad2 size={24} /><span>APEX<span className="ember">NOVA</span></span>
         </button>
         <span className="status"><i className="pulse" /> ARENA ACCESS</span>
         <button className="iconButton" onClick={() => router.push('/')} aria-label="Back to home">×</button>

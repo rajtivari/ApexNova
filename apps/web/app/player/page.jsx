@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2, CircleDollarSign, Crosshair, Gamepad2, LogOut, RefreshCw, ShieldCheck, Swords, Users, Wallet } from 'lucide-react';
+import { Activity, ArrowRight, Bell, CalendarDays, CheckCircle2, CircleDollarSign, Gamepad2, LogOut, RefreshCw, ShieldCheck, Swords, Users, Wallet } from 'lucide-react';
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://apexnova-api.onrender.com').replace(/\/$/, '');
 const SESSION_KEY = 'apexnova-local-session-v1';
@@ -220,7 +220,7 @@ export default function PlayerPage() {
   }
 
   if (loading && !session) return <main className="shell"><p className="eyebrow">CONNECTING TO PLAYER NETWORK…</p></main>;
-  if (!session) return <main className="shell localAccessDenied"><Crosshair size={32} /><p className="eyebrow">PLAYER ACCESS</p><h1>SIGN IN TO CONTINUE.</h1><p className="lede">Your player workspace uses the ApexNova API. Sign in to load your account, teams, and tournaments.</p><Link className="primaryButton" href="/login">SIGN IN <ArrowRight size={16}/></Link></main>;
+  if (!session) return <main className="shell localAccessDenied"><Gamepad2 size={32} /><p className="eyebrow">PLAYER ACCESS</p><h1>SIGN IN TO CONTINUE.</h1><p className="lede">Your player workspace uses the ApexNova API. Sign in to load your account, teams, and tournaments.</p><Link className="primaryButton" href="/login">SIGN IN <ArrowRight size={16}/></Link></main>;
 
   const myTeam = teams.find((item) => item.captain?.id === profile?.id || item.members?.some((member) => member.userId === profile?.id));
   const openEvents = tournaments.filter((item) => item.status === 'REGISTRATION_OPEN');
@@ -229,7 +229,7 @@ export default function PlayerPage() {
   return (
     <main className="shell playerDashboard">
       <header className="topbar">
-        <Link href="/" className="brand"><Crosshair size={24}/><span>APEX<span className="ember">NOVA</span></span></Link>
+        <Link href="/" className="brand"><Gamepad2 size={24}/><span>APEX<span className="ember">NOVA</span></span></Link>
         <span className="status"><i className="pulse"/> PLAYER NETWORK / LIVE DATA</span>
         <button className="secondaryButton" onClick={signOut}><LogOut size={15}/> SIGN OUT</button>
       </header>

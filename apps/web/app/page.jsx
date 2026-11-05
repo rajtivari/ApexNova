@@ -1,134 +1,115 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  ArrowDownRight, ArrowRight, Bell, CalendarDays, ChevronDown, CircleDollarSign,
-  Flame, Gamepad2, Gift, Menu, Search, ShieldCheck, Swords, Trophy, Users, X,
-  Zap, Crosshair, Crown, Medal
-} from 'lucide-react';
+import { ArrowRight, CalendarDays, Gamepad2, Menu, Search, ShieldCheck, Trophy, Users, Wallet, X, Zap } from 'lucide-react';
 
-const demoTournaments = [
-  { id:'NOVA-041', title:'EMBER CLASH', game:'FREE FIRE', mode:'SQUAD · BATTLE ROYALE', entry:0, prize:5000, slots:48, filled:31, date:'18 OCT', time:'06:30 PM', status:'REGISTRATION OPEN', color:'ember', tag:'FREE ENTRY' },
-  { id:'NOVA-042', title:'NIGHT OPS: BGMI', game:'BGMI', mode:'SQUAD · CLASSIC', entry:29, prize:8000, slots:64, filled:42, date:'19 OCT', time:'07:00 PM', status:'REGISTRATION OPEN', color:'cyan', tag:'MOST POPULAR' },
-  { id:'NOVA-043', title:'RUSH HOUR #08', game:'FREE FIRE', mode:'SOLO · CLASH SQUAD', entry:10, prize:2500, slots:48, filled:44, date:'20 OCT', time:'05:00 PM', status:'FEW SLOTS LEFT', color:'olive', tag:'LAST 4 SLOTS' },
-  { id:'NOVA-044', title:'SUNDAY SHOWDOWN', game:'BGMI', mode:'DUO · ERANGEL', entry:0, prize:4000, slots:50, filled:18, date:'22 OCT', time:'08:00 PM', status:'REGISTRATION OPEN', color:'ember', tag:'FREE ENTRY' },
-];
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://apexnova-api.onrender.com').replace(/\/$/, '');
+const LOGIN_URL = '/ApexNova/login/';
+const money = (value) => '₹' + Number(value || 0).toLocaleString('en-IN');
 
-const leaderboard = [
-  { rank:'01', name:'VOIDxRUSH', points:2840, wins:18, medal:'gold' },
-  { rank:'02', name:'NOVA•REX', points:2615, wins:15, medal:'silver' },
-  { rank:'03', name:'KAIRO.exe', points:2390, wins:12, medal:'bronze' },
-  { rank:'04', name:'NIGHT RAID', points:2180, wins:11, medal:'' },
-];
-
-function money(value) { return '₹' + Number(value).toLocaleString('en-IN'); }
+function normalizeTournament(item) {
+  const start = new Date(item.startsAt);
+  return {
+    id: item.id,
+    name: item.name,
+    game: item.game === 'FREE_FIRE' ? 'FREE FIRE' : item.game,
+    format: String(item.format || 'TOURNAMENT').replaceAll('_', ' '),
+    status: String(item.status || 'SCHEDULED').replaceAll('_', ' '),
+    fee: Number(item.entryFee || 0),
+    prize: Number(item.prizePool || 0),
+    date: Number.isNaN(start.getTime()) ? 'Schedule to be announced' : start.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+  };
+}
 
 export default function Home() {
+  const [tournaments, setTournaments] = useState([]);
+  const [feedState, setFeedState] = useState('loading');
   const [game, setGame] = useState('ALL');
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [tournaments, setTournaments] = useState(demoTournaments);
-  const [tournamentSource, setTournamentSource] = useState('demo');
-  const [tournamentsLoading, setTournamentsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'https://apexnova-api.onrender.com').replace(/\/$/, '');
-    fetch(apiBase + '/api/tournaments', { headers: { Accept: 'application/json' } })
+    fetch(API_BASE_URL + '/api/tournaments', { headers: { Accept: 'application/json' } })
       .then((response) => { if (!response.ok) throw new Error('Tournament service unavailable'); return response.json(); })
       .then((items) => {
-        if (!active || !Array.isArray(items)) return;
-        const liveItems = items.map((item, index) => {
-          const start = new Date(item.startsAt);
-          const labels = { DRAFT: 'DRAFT', PUBLISHED: 'COMING SOON', REGISTRATION_OPEN: 'REGISTRATION OPEN', REGISTRATION_CLOSED: 'REGISTRATION CLOSED', LIVE: 'LIVE NOW', COMPLETED: 'COMPLETED', CANCELLED: 'CANCELLED' };
-          const gameName = item.game === 'FREE_FIRE' ? 'FREE FIRE' : item.game === 'BGMI' ? 'BGMI' : item.game;
-          return { id: String(item.id).slice(-8).toUpperCase(), title: item.name, game: gameName, mode: String(item.format || 'TOURNAMENT').replaceAll('_', ' '), entry: Number(item.entryFee || 0), prize: Number(item.prizePool || 0), slots: Math.max(Number(item.maxSlots || 48), Number(item._count?.registrations || 0), 1), filled: Number(item._count?.registrations || 0), date: Number.isNaN(start.getTime()) ? 'TBA' : start.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }).toUpperCase(), time: Number.isNaN(start.getTime()) ? 'TIME TBA' : start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }), status: labels[item.status] || String(item.status || 'SCHEDULED').replaceAll('_', ' '), color: index % 3 === 0 ? 'cyan' : index % 3 === 1 ? 'ember' : 'olive', tag: item.status === 'LIVE' ? 'LIVE NOW' : Number(item.entryFee || 0) === 0 ? 'FREE ENTRY' : 'OFFICIAL EVENT' };
-        });
-        setTournaments(liveItems);
-        setTournamentSource('live');
+        if (!active) return;
+        setTournaments(Array.isArray(items) ? items.map(normalizeTournament) : []);
+        setFeedState('online');
       })
-      .catch(() => { if (active) { setTournaments(demoTournaments); setTournamentSource('demo'); } })
-      .finally(() => { if (active) setTournamentsLoading(false); });
+      .catch(() => { if (active) setFeedState('offline'); });
     return () => { active = false; };
   }, []);
 
-  const visible = useMemo(() => tournaments.filter(t => (game === 'ALL' || t.game === game) && (t.title + t.game + t.mode).toLowerCase().includes(query.toLowerCase())), [tournaments, game, query]);
+  const visible = useMemo(() => tournaments.filter((item) => {
+    const gameMatches = game === 'ALL' || item.game === game;
+    const textMatches = (item.name + ' ' + item.game + ' ' + item.format).toLowerCase().includes(query.toLowerCase());
+    return gameMatches && textMatches;
+  }), [tournaments, game, query]);
+
+  const nextEvent = tournaments.find((item) => ['REGISTRATION_OPEN', 'PUBLISHED', 'LIVE'].includes(item.status));
 
   return (
-    <main className="nova-site">
-      <div className="nova-topline"><span><i className="live-dot" /> PLATFORM STATUS: ONLINE</span><span>INDIA SERVER <b>IN · 01</b></span><span className="topline-right">PLAY FAIR. PLAY HARD. <span className="topline-mark">↗</span></span></div>
-      <header className="nova-nav">
-        <a className="nova-brand" href="/ApexNova/" aria-label="ApexNova home"><span className="brand-symbol"><Crosshair size={22}/><i /></span><span>APEX<span className="brand-orange">NOVA</span><small>COMPETITIVE ARENA</small></span></a>
-        <nav className={menuOpen ? 'nav-links nav-open' : 'nav-links'}>
-          <a className="nav-active" href="#tournaments" onClick={() => setMenuOpen(false)}>TOURNAMENTS</a>
-          <a href="#leaderboard" onClick={() => setMenuOpen(false)}>LEADERBOARD</a>
-          <a href="#how-it-works" onClick={() => setMenuOpen(false)}>HOW TO PLAY</a>
-          <a href="#rewards" onClick={() => setMenuOpen(false)}>REWARDS</a>
+    <main className="arena-site">
+      <div className="arena-topline">
+        <span><i className={'arena-status-dot ' + (feedState === 'online' ? 'is-live' : '')}/>{feedState === 'online' ? 'ARENA CONNECTED' : feedState === 'loading' ? 'CONNECTING TO ARENA' : 'MATCH FEED OFFLINE'}</span>
+        <span>FREE FIRE <b>·</b> BGMI <b>·</b> INDIA</span>
+      </div>
+
+      <header className="arena-nav">
+        <a className="arena-brand" href="/ApexNova/" aria-label="ApexNova home"><span className="arena-brand-mark"><Zap size={21} fill="currentColor"/></span><span>APEX<span>NOVA</span><small>COMPETITIVE GAMING</small></span></a>
+        <button className="arena-menu-toggle" aria-label="Toggle menu" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X/> : <Menu/>}</button>
+        <nav className={menuOpen ? 'arena-nav-links is-open' : 'arena-nav-links'}>
+          <a href="#matches" onClick={() => setMenuOpen(false)}>Matches</a>
+          <a href="#how-to-play" onClick={() => setMenuOpen(false)}>How it works</a>
+          <a href="#rewards" onClick={() => setMenuOpen(false)}>Rewards</a>
         </nav>
-        <div className="nav-actions"><a className="nav-signin" href="/ApexNova/login/">LOG IN</a><a className="nav-join" href="/ApexNova/login/">JOIN THE ARENA <ArrowRight size={15}/></a></div>
-        <button className="mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle navigation">{menuOpen ? <X/> : <Menu/>}</button>
+        <div className="arena-nav-actions"><a className="arena-login-link" href={LOGIN_URL}>Sign in</a><a className="arena-cta-button" href={LOGIN_URL}>Create player ID <ArrowRight size={16}/></a></div>
       </header>
 
-      <section className="nova-hero">
-        <div className="hero-gridlines" />
-        <div className="hero-copy">
-          <div className="section-kicker"><span>01</span> INDIA'S COMPETITIVE PLAYGROUND <span className="kicker-line" /></div>
-          <h1>YOUR GAME.<br/><span>YOUR GLORY.</span></h1>
-          <p className="hero-sub">Queue up. Squad up. Take the win.</p>
-          <p className="hero-description">Compete in Free Fire and BGMI tournaments, climb the rankings, and turn every match into a moment that counts.</p>
-          <div className="hero-cta"><a className="button-primary" href="#tournaments">FIND YOUR TOURNAMENT <ArrowRight size={17}/></a><a className="button-quiet" href="#how-it-works"><span className="play-triangle">▶</span> HOW IT WORKS</a></div>
-          <div className="hero-proof"><span><ShieldCheck size={15}/> FAIR PLAY SYSTEM</span><span><Zap size={15}/> FAST REGISTRATION</span><span><Trophy size={15}/> VERIFIED RESULTS</span></div>
+      <section className="arena-hero">
+        <div className="arena-hero-copy">
+          <p className="arena-eyebrow"><span>APEXNOVA / 01</span> YOUR NEXT MATCH STARTS HERE</p>
+          <h1>PLAY FOR<br/><em>THE MOMENT.</em></h1>
+          <p className="arena-hero-lede">Find your squad. Enter the lobby. Make every game count in India’s competitive Free Fire and BGMI arena.</p>
+          <div className="arena-hero-actions"><a className="arena-cta-button arena-cta-large" href="#matches">Explore tournaments <ArrowRight size={18}/></a><a className="arena-text-button" href={LOGIN_URL}>Open player hub <span>↗</span></a></div>
+          <div className="arena-trust-row"><span><ShieldCheck size={16}/> Reviewed results</span><span><Users size={16}/> Squad ready</span><span><Wallet size={16}/> Prize history</span></div>
         </div>
-        <div className="hero-art" aria-label="ApexNova competitive gaming artwork">
-          <div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" />
-          <div className="art-cross cross-a">+</div><div className="art-cross cross-b">+</div>
-          <div className="art-panel panel-top"><span>LIVE COMPETITION</span><b><i className="live-dot"/> OPEN</b></div>
-          <div className="hero-emblem"><div className="emblem-outer"><div className="emblem-inner"><Crosshair size={102} strokeWidth={1.1}/><span>N</span></div></div><div className="emblem-ring">A P E X N O V A · A R E N A · A P E X N O V A ·</div></div>
-          <div className="art-panel panel-bottom"><div><small>NEXT EVENT</small><strong>EMBER CLASH <span>#04</span></strong></div><div className="panel-time"><CalendarDays size={15}/> 18 OCT <b>·</b> 18:30</div></div>
-          <div className="art-vertical">COMPETE // IMPROVE // REPEAT</div>
-          <div className="art-coordinate">12°58' N<br/>77°35' E</div>
+        <div className="arena-hero-visual">
+          <div className="arena-visual-orbit arena-orbit-one"/><div className="arena-visual-orbit arena-orbit-two"/>
+          <div className="arena-visual-grid"/>
+          <div className="arena-visual-stamp">APX<br/><b>ARENA</b></div>
+          <div className="arena-match-card">
+            <div className="arena-match-card-top"><span><i className={'arena-status-dot ' + (nextEvent ? 'is-live' : '')}/>{nextEvent ? 'OPEN FOR PLAYERS' : 'THE NEXT ROUND'}</span><span>IND / 01</span></div>
+            <div className="arena-versus"><div className="arena-game-chip"><Gamepad2 size={20}/><span>{nextEvent?.game || 'FREE FIRE'}<small>{nextEvent?.format || 'SQUAD TOURNAMENT'}</small></span></div><span className="arena-versus-mark">VS</span><div className="arena-game-chip arena-game-chip-alt"><Trophy size={20}/><span>YOUR SQUAD<small>YOUR NEXT WIN</small></span></div></div>
+            <div className="arena-match-card-bottom"><span>{nextEvent?.name || 'Find your next lobby'}</span><b>{nextEvent ? money(nextEvent.prize) : 'APEX NOVA'}</b></div>
+          </div>
+          <div className="arena-visual-caption"><span>QUEUE UP / PLAY FAIR / LEVEL UP</span><span>01 — 04</span></div>
         </div>
-        <div className="hero-bottomline"><span>SCROLL TO EXPLORE <ArrowDownRight size={15}/></span><span>BUILT FOR THE GRIND <b>/// 2026</b></span></div>
       </section>
 
-      <section className="nova-stats" aria-label="Platform highlights">
-        <div className="stat-intro"><span className="section-kicker"><span>02</span> THE ARENA</span><strong>EVERY MATCH<br/>HAS A <em>STORY.</em></strong></div>
-        <div className="nova-stat"><span className="stat-icon"><Users size={18}/></span><strong>01<span>K+</span></strong><small>PLAYERS READY</small></div>
-        <div className="nova-stat"><span className="stat-icon"><Swords size={18}/></span><strong>02</strong><small>GAMES. ONE ARENA.</small></div>
-        <div className="nova-stat"><span className="stat-icon"><CircleDollarSign size={18}/></span><strong>₹<span>20K</span></strong><small>DEMO PRIZE POOLS</small></div>
-        <div className="stats-note">SHOWCASE DATA<br/><span>EVENTS & PRIZES ARE DEMONSTRATION CONTENT</span></div>
+      <section className="arena-proof-strip" aria-label="Platform highlights">
+        <div><span className="arena-proof-icon"><Gamepad2 size={19}/></span><p><b>COMPETE YOUR WAY</b><small>Solo, duo, and squad formats</small></p></div>
+        <div><span className="arena-proof-icon"><ShieldCheck size={19}/></span><p><b>FAIR MATCHES</b><small>Rules and results stay visible</small></p></div>
+        <div><span className="arena-proof-icon"><Wallet size={19}/></span><p><b>ONE PLAYER HUB</b><small>Track matches and prize history</small></p></div>
       </section>
 
-      <section className="tournament-section" id="tournaments">
-        <div className="section-head"><div><div className="section-kicker"><span>03</span> FIND YOUR NEXT MATCH</div><h2>THE <span>LINEUP.</span></h2><p>Pick your game. Find your lobby. Make your mark.</p></div><a className="text-link" href="/ApexNova/login/">PLAYER HUB <ArrowRight size={16}/></a></div>
-        <div className="tournament-tools"><div className="game-filters"><button className={game==='ALL'?'filter-active':''} onClick={()=>setGame('ALL')}>ALL GAMES <span>{tournaments.length.toString().padStart(2, '0')}</span></button><button className={game==='FREE FIRE'?'filter-active':''} onClick={()=>setGame('FREE FIRE')}><span className="game-mini ff">FF</span> FREE FIRE</button><button className={game==='BGMI'?'filter-active':''} onClick={()=>setGame('BGMI')}><span className="game-mini bg">B</span> BGMI</button></div><label className="tournament-search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search tournaments..." aria-label="Search tournaments"/><span>/</span></label></div>
-        <div className="tournament-grid">
-          {tournamentsLoading && <div className="no-tournaments">SYNCING TOURNAMENT FEED…</div>}
-          {!tournamentsLoading && visible.map((t, i) => <article className={'tournament-card card-'+t.color} key={t.id}>
-            <div className="card-art"><div className="card-art-lines"/><div className="card-game-stamp">{t.game==='BGMI'?'BATTLEGROUNDS':'FREE FIRE'}<span> // COMPETITIVE SERIES</span></div><div className="card-game-mark">{t.game==='BGMI'?'B':'FF'}</div><span className="card-number">0{i+1} / 04</span><span className="card-tag">{t.tag}</span></div>
-            <div className="card-content"><div className="card-meta"><span>{t.id}</span><span className="card-live"><i className="live-dot"/>{t.status}</span></div><h3>{t.title}</h3><p className="card-mode"><Gamepad2 size={14}/>{t.mode}</p>
-              <div className="card-prizes"><div><small>PRIZE POOL</small><strong>{money(t.prize)}</strong></div><div><small>ENTRY FEE</small><strong className={t.entry===0?'free-entry':''}>{t.entry===0?'FREE':money(t.entry)}</strong></div></div>
-              <div className="slot-line"><div><span>LOBBY CAPACITY</span><b>{t.filled}/{t.slots}</b></div><div className="slot-track"><i style={{width:(t.filled/t.slots*100)+'%'}}/></div></div>
-              <div className="card-footer"><span><CalendarDays size={14}/>{t.date} <b>·</b> {t.time}</span><a href="/ApexNova/login/" aria-label={'Register for '+t.title}>ENTER ARENA <ArrowRight size={15}/></a></div>
-            </div>
-          </article>)}
-          {visible.length===0 && <div className="no-tournaments">NO MATCHES FOUND. TRY ANOTHER GAME OR SEARCH.</div>}
-        </div>
-        <p className="demo-disclaimer"><ShieldCheck size={14}/> {tournamentSource === 'live' ? 'Tournament listings are loaded from the ApexNova API. Registration, paid entry, and payouts remain subject to verified backend and payment configuration.' : 'Showing showcase fixtures because the live tournament service could not be reached. These are not real events or prize offers.'}</p>
+      <section className="arena-matches-section" id="matches">
+        <div className="arena-section-heading"><div><p className="arena-eyebrow"><span>02 / FIND A LOBBY</span></p><h2>UPCOMING <em>MATCHES</em></h2><p>Choose your game and find an event that fits your squad.</p></div><a className="arena-text-button" href={LOGIN_URL}>Go to player hub <span>↗</span></a></div>
+        <div className="arena-match-tools"><div className="arena-game-filters"><button className={game === 'ALL' ? 'is-selected' : ''} onClick={() => setGame('ALL')}>All games</button><button className={game === 'FREE FIRE' ? 'is-selected' : ''} onClick={() => setGame('FREE FIRE')}>Free Fire</button><button className={game === 'BGMI' ? 'is-selected' : ''} onClick={() => setGame('BGMI')}>BGMI</button></div><label className="arena-search"><Search size={16}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search tournaments" aria-label="Search tournaments"/></label></div>
+        {feedState === 'offline' ? <div className="arena-empty-state"><span className="arena-empty-icon"><Zap size={22}/></span><div><b>Match feed is taking a break.</b><p>We couldn’t reach the tournament service. Check back when the arena is online.</p></div><a href={LOGIN_URL}>Player sign in <ArrowRight size={15}/></a></div> :
+          feedState === 'loading' ? <div className="arena-event-grid"><div className="arena-event-skeleton"/><div className="arena-event-skeleton"/><div className="arena-event-skeleton"/></div> :
+          visible.length ? <div className="arena-event-grid">{visible.map((event) => <article className="arena-event-card" key={event.id}><div className="arena-event-card-head"><span className="arena-event-game">{event.game}</span><span className="arena-event-status">{event.status}</span></div><h3>{event.name}</h3><p className="arena-event-format">{event.format}</p><div className="arena-event-details"><div><small>PRIZE POOL</small><b>{money(event.prize)}</b></div><div><small>ENTRY</small><b className={event.fee === 0 ? 'is-free' : ''}>{event.fee === 0 ? 'Free' : money(event.fee)}</b></div></div><p className="arena-event-date"><CalendarDays size={15}/>{event.date}</p><a href={LOGIN_URL}>View event <ArrowRight size={15}/></a></article>)}</div> :
+          <div className="arena-empty-state"><span className="arena-empty-icon"><Gamepad2 size={22}/></span><div><b>No matches are listed right now.</b><p>New events will appear here as soon as the tournament desk publishes them.</p></div><a href={LOGIN_URL}>Join ApexNova <ArrowRight size={15}/></a></div>}
       </section>
 
-      <section className="arena-band" id="how-it-works"><div className="band-graphic"><div className="band-cross">✳</div><span>READY<br/>CHECK</span><b>APX / 01</b></div><div className="band-copy"><div className="section-kicker"><span>04</span> NO COMPLICATED SETUP</div><h2>THREE STEPS.<br/><em>ALL GAME.</em></h2></div><div className="steps-list"><div><span>01</span><div><strong>CREATE YOUR PLAYER ID</strong><p>Set up your profile and choose your game.</p></div><ArrowRight size={16}/></div><div><span>02</span><div><strong>JOIN A TOURNAMENT</strong><p>Pick solo, duo, or squad events and register.</p></div><ArrowRight size={16}/></div><div><span>03</span><div><strong>PLAY. SUBMIT. CLIMB.</strong><p>Submit results, track standings, earn recognition.</p></div><ArrowRight size={16}/></div></div></section>
-
-      <section className="community-section" id="leaderboard">
-        <div className="leaderboard-block"><div className="section-kicker"><span>05</span> THE RANKING BOARD</div><div className="section-head compact"><div><h2>TOP <span>FRAGGERS.</span></h2><p>Every point tells a story.</p></div><span className="season-chip"><i className="live-dot"/> SEASON 01</span></div>
-          <div className="leader-table"><div className="leader-row leader-header"><span>RANK</span><span>PLAYER / SQUAD</span><span>WINS</span><span>POINTS</span></div>{leaderboard.map(p=><div className="leader-row" key={p.rank}><span className={'leader-rank '+p.medal}>{p.rank}{p.medal==='gold'?<Crown size={13}/>:p.medal==='silver'?<Medal size={13}/>:p.medal==='bronze'?<Medal size={13}/>:null}</span><strong>{p.name}</strong><span>{p.wins}</span><b>{p.points.toLocaleString('en-IN')}</b></div>)}</div><p className="demo-disclaimer"><ShieldCheck size={14}/> Sample leaderboard data. Verified rankings will be driven by approved match results.</p>
-        </div>
-        <div className="rewards-block" id="rewards"><div className="rewards-top"><span className="section-kicker"><span>06</span> MORE THAN A WIN</span><Gift size={25}/></div><h2>STACK YOUR<br/><em>REWARDS.</em></h2><p>Track prize history, get tournament certificates, invite your squad, and keep every achievement in one player hub.</p><div className="reward-items"><div><Trophy size={17}/><span>ACHIEVEMENT<br/><b>CERTIFICATES</b></span></div><div><CircleDollarSign size={17}/><span>PRIZE<br/><b>HISTORY</b></span></div><div><Gift size={17}/><span>REFER &<br/><b>EARN</b></span></div></div><a className="button-primary full-button" href="/ApexNova/login/">OPEN PLAYER HUB <ArrowRight size={16}/></a><span className="rewards-note">DEMO MODE · NO REAL-MONEY PAYOUTS</span></div>
+      <section className="arena-steps-section" id="how-to-play">
+        <div className="arena-section-heading"><div><p className="arena-eyebrow"><span>03 / HOW TO PLAY</span></p><h2>FROM SIGN-UP<br/>TO <em>SHOWDOWN.</em></h2></div><p>Everything you need to go from player ID to match day.</p></div>
+        <div className="arena-steps-grid"><article><span>01</span><Gamepad2 size={24}/><h3>Create your player ID</h3><p>Set up your profile and add your squad.</p></article><article><span>02</span><ShieldCheck size={24}/><h3>Read the match rules</h3><p>Review the details and enter your game UID.</p></article><article><span>03</span><Trophy size={24}/><h3>Play and climb</h3><p>Submit results, track standings, and keep your achievements.</p></article></div>
       </section>
 
-      <section className="final-cta"><div className="cta-radar"><Crosshair size={78} strokeWidth={1}/></div><div><div className="section-kicker"><span>07</span> YOUR NEXT ROUND STARTS HERE</div><h2>DROP IN.<br/><span>STAND OUT.</span></h2></div><a className="button-primary" href="/ApexNova/login/">JOIN APEX NOVA <ArrowRight size={17}/></a><span className="cta-code">APX-ARENA / 001</span></section>
-
-      <footer className="nova-footer"><a className="nova-brand" href="/ApexNova/"><span className="brand-symbol"><Crosshair size={22}/><i /></span><span>APEX<span className="brand-orange">NOVA</span><small>COMPETITIVE ARENA</small></span></a><p>BUILT FOR PLAYERS WHO SHOW UP.</p><div className="footer-links"><a href="/ApexNova/login/">PLAYER LOGIN</a><a href="#tournaments">TOURNAMENTS</a><a href="#leaderboard">LEADERBOARD</a></div><span className="footer-copy">© 2026 APEXNOVA · PORTFOLIO DEMO</span></footer>
+      <section className="arena-rewards-section" id="rewards"><div><p className="arena-eyebrow"><span>04 / PLAYER HUB</span></p><h2>EVERY MATCH<br/>LEAVES A <em>MARK.</em></h2><p>Follow your squad, get match updates, and keep tournament rewards in one place.</p></div><a className="arena-cta-button arena-cta-large" href={LOGIN_URL}>Enter the player hub <ArrowRight size={18}/></a><div className="arena-rewards-mark"><Trophy size={38}/><span>PLAY / PROVE / PROGRESS</span></div></section>
+      <footer className="arena-footer"><a className="arena-brand" href="/ApexNova/"><span className="arena-brand-mark"><Zap size={20} fill="currentColor"/></span><span>APEX<span>NOVA</span><small>COMPETITIVE GAMING</small></span></a><span>Built for players who show up.</span><nav><a href="#matches">Matches</a><a href="#how-to-play">How it works</a><a href={LOGIN_URL}>Player sign in</a></nav><small>© 2026 ApexNova</small></footer>
     </main>
   );
 }
