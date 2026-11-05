@@ -56,7 +56,7 @@ async function writeEncrypted(name, bytes) {
   return documentKey;
 }
 async function removeEncrypted(documentKey) {
-  if (!documentKey || !/^[a-z-]+-[0-9a-f-]+\\.enc$/.test(documentKey)) return;
+  if (!documentKey || !/^[a-z-]+-[0-9a-f-]+\.enc$/.test(documentKey)) return;
   try { await unlink(path.join(storageDirectory(), documentKey)); } catch (error) { if (error.code !== 'ENOENT') throw error; }
 }
 async function readEncrypted(documentKey) {
