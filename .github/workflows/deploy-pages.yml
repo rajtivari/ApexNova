@@ -35,6 +35,8 @@ jobs:
         working-directory: apps/web
         env:
           NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_UPI_QR_URL: ${{ vars.NEXT_PUBLIC_UPI_QR_URL }}
+          NEXT_PUBLIC_KYC_UPLOADS_ENABLED: ${{ vars.NEXT_PUBLIC_KYC_UPLOADS_ENABLED }}
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
         with:
