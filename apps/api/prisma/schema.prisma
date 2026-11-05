@@ -99,6 +99,8 @@ model Kyc {
   maskedAadhaar String?
   selfieDocumentKey String?
   aadhaarDocumentKey String?
+  selfieMimeType String?
+  aadhaarMimeType String?
   dateOfBirth DateTime?
   status String @default("NOT_SUBMITTED")
   reviewedAt DateTime?
