@@ -306,12 +306,12 @@ export default function PlayerPage() {
       </div>}
       <section className="playerPanel">
         <div className="playerPanelHeading"><div><p className="eyebrow">PLAYER IDENTITY / AGE 18+</p><h2>IDENTITY <span className="ember">CHECK.</span></h2></div><ShieldCheck size={22}/></div>
-        <div className="playerIdentityStatus"><span className={'adminStatusPill ' + (kyc.status === 'APPROVED' ? 'adminStatusLive' : '')}>{String(kyc.status || 'NOT_SUBMITTED').replaceAll('_', ' ')}</span><span>{kyc.dateOfBirth ? 'Date of birth submitted for review.' : 'No date of birth submitted.'}</span>{kyc.reviewNote && <small>{kyc.reviewNote}</small>}</div>
+        <div className="playerIdentityStatus"><span className={'adminStatusPill ' + (kyc.status === 'APPROVED' ? 'adminStatusLive' : '')}>{String(kyc.status || 'NOT_SUBMITTED').replaceAll('_', ' ')}</span><span>{kyc.ageVerified ? 'Age 18+ verified.' : kyc.dateOfBirth ? 'Date of birth submitted for review.' : 'No date of birth submitted.'}</span>{kyc.reviewNote && <small>{kyc.reviewNote}</small>}</div>
         {kyc.status !== 'APPROVED' && <form className="playerIdentityForm" onSubmit={submitKyc}>
           <label>DATE OF BIRTH<input type="date" value={kycForm.dateOfBirth} onChange={(event) => setKycForm({ ...kycForm, dateOfBirth: event.target.value })} required /></label>
           <label>SELFIE PHOTO<input type="file" accept="image/jpeg,image/png" onChange={(event) => setKycImage('selfie', event.target.files?.[0])} required /></label>
           <label>MASKED AADHAAR CARD PHOTO<input type="file" accept="image/jpeg,image/png" onChange={(event) => setKycImage('aadhaarImage', event.target.files?.[0])} required /><small>Hide the first 8 digits before uploading. JPEG/PNG, up to 2 MB.</small></label>
-          <label className="playerKycConsent"><input type="checkbox" checked={kycForm.consent} onChange={(event) => setKycForm({ ...kycForm, consent: event.target.checked })} required /><span>I consent to ApexNova using these images and my date of birth only for identity and age verification. They are encrypted and visible to authorized reviewers only.</span></label>
+          <label className="playerKycConsent"><input type="checkbox" checked={kycForm.consent} onChange={(event) => setKycForm({ ...kycForm, consent: event.target.checked })} required /><span>I consent to ApexNova using these images and my date of birth only for identity and age verification. They are encrypted, visible only to authorized reviewers, and deleted after review.</span></label>
           <button className="primaryButton" type="submit" disabled={busy || !KYC_UPLOADS_ENABLED}>{busy ? 'SUBMITTING…' : 'SEND FOR ADMIN REVIEW'} <ArrowRight size={15}/></button>
           {!KYC_UPLOADS_ENABLED && <small className="fieldNote warning">Secure identity storage is not configured on this deployment yet.</small>}
         </form>}
