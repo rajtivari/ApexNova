@@ -32,7 +32,7 @@ CREATE TABLE "WithdrawalRequest" (
   "id" TEXT NOT NULL,
   "userId" TEXT NOT NULL,
   "transactionId" TEXT NOT NULL,
-  "amount" DECIMAL(12,2) NOT NULL,
+  "amount" DECIMAL(65,30) NOT NULL,
   "encryptedDestination" TEXT NOT NULL,
   "maskedDestination" TEXT NOT NULL,
   "status" "WithdrawalStatus" NOT NULL DEFAULT 'PENDING',
