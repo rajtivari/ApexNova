@@ -14,7 +14,6 @@ const imageSchema = z.object({
   mimeType: z.enum(['image/jpeg', 'image/png']),
 });
 const submissionSchema = z.object({
-  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   consent: z.literal(true),
   selfie: imageSchema,
   aadhaarImage: imageSchema,
@@ -37,12 +36,6 @@ function documentBytes(input) {
     : bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   if (!valid) throw new Error('The image content does not match its file type.');
   return bytes;
-}
-function ageOn(dateOfBirth, now = new Date()) {
-  let age = now.getUTCFullYear() - dateOfBirth.getUTCFullYear();
-  const month = now.getUTCMonth() - dateOfBirth.getUTCMonth();
-  if (month < 0 || (month === 0 && now.getUTCDate() < dateOfBirth.getUTCDate())) age -= 1;
-  return age;
 }
 function storageDirectory() {
   return path.resolve(process.env.KYC_PRIVATE_STORAGE_DIR);
@@ -68,9 +61,6 @@ async function readEncrypted(documentKey) {
 router.post('/me', async (req, res) => {
   if (!enabled()) return res.status(503).json({ error: 'Secure identity verification is not configured on this server' });
   const input = submissionSchema.parse(req.body);
-  const dateOfBirth = new Date(input.dateOfBirth + 'T00:00:00.000Z');
-  if (Number.isNaN(dateOfBirth.getTime()) || dateOfBirth.toISOString().slice(0, 10) !== input.dateOfBirth) return res.status(400).json({ error: 'Enter a valid date of birth' });
-  if (ageOn(dateOfBirth) < 18) return res.status(403).json({ error: 'Players must be at least 18 years old' });
 
   let selfie, aadhaarImage;
   try {
@@ -93,9 +83,9 @@ router.post('/me', async (req, res) => {
   }
   const kyc = await prisma.kyc.upsert({
     where: { userId: req.user.id },
-    create: { userId: req.user.id, selfieDocumentKey: selfieKey, aadhaarDocumentKey: aadhaarKey, selfieMimeType: input.selfie.mimeType, aadhaarMimeType: input.aadhaarImage.mimeType, dateOfBirth, status: 'PENDING' },
-    update: { selfieDocumentKey: selfieKey, aadhaarDocumentKey: aadhaarKey, selfieMimeType: input.selfie.mimeType, aadhaarMimeType: input.aadhaarImage.mimeType, dateOfBirth, status: 'PENDING', reviewedAt: null, reviewedById: null, reviewNote: null, ageVerified: false, encryptedAadhaar: null, maskedAadhaar: null },
-    select: { status: true, ageVerified: true, dateOfBirth: true, reviewedAt: true, reviewNote: true },
+    create: { userId: req.user.id, selfieDocumentKey: selfieKey, aadhaarDocumentKey: aadhaarKey, selfieMimeType: input.selfie.mimeType, aadhaarMimeType: input.aadhaarImage.mimeType, status: 'PENDING' },
+    update: { selfieDocumentKey: selfieKey, aadhaarDocumentKey: aadhaarKey, selfieMimeType: input.selfie.mimeType, aadhaarMimeType: input.aadhaarImage.mimeType, status: 'PENDING', reviewedAt: null, reviewedById: null, reviewNote: null, ageVerified: false, encryptedAadhaar: null, maskedAadhaar: null },
+    select: { status: true, ageVerified: true, reviewedAt: true, reviewNote: true },
   });
   await logAction(prisma, { actorId: req.user.id, action: 'KYC_SUBMITTED', entity: 'Kyc', entityId: req.user.id, metadata: { documents: ['selfie', 'masked_aadhaar_image'] } });
   return res.status(202).json(kyc);
@@ -104,17 +94,17 @@ router.post('/me', async (req, res) => {
 router.get('/me', async (req, res) => {
   const kyc = await req.app.locals.prisma.kyc.findUnique({
     where: { userId: req.user.id },
-    select: { status: true, ageVerified: true, dateOfBirth: true, reviewedAt: true, reviewNote: true },
+    select: { status: true, ageVerified: true, reviewedAt: true, reviewNote: true },
   });
   return res.json(kyc || { status: 'NOT_SUBMITTED' });
 });
 
 router.get('/admin', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => {
   const rows = await req.app.locals.prisma.kyc.findMany({
-    select: { userId: true, status: true, dateOfBirth: true, selfieDocumentKey: true, aadhaarDocumentKey: true, reviewedAt: true, reviewNote: true, user: { select: { email: true, profile: { select: { displayName: true } } } } },
+    select: { userId: true, status: true, selfieDocumentKey: true, aadhaarDocumentKey: true, reviewedAt: true, reviewNote: true, user: { select: { email: true, profile: { select: { displayName: true } } } } },
     orderBy: [{ status: 'asc' }, { userId: 'asc' }],
   });
-  return res.json(rows.map((row) => ({ userId: row.userId, status: row.status, dateOfBirth: row.dateOfBirth, hasSelfie: Boolean(row.selfieDocumentKey), hasAadhaarImage: Boolean(row.aadhaarDocumentKey), reviewedAt: row.reviewedAt, reviewNote: row.reviewNote, user: row.user })));
+  return res.json(rows.map((row) => ({ userId: row.userId, status: row.status, hasSelfie: Boolean(row.selfieDocumentKey), hasAadhaarImage: Boolean(row.aadhaarDocumentKey), reviewedAt: row.reviewedAt, reviewNote: row.reviewNote, user: row.user })));
 });
 
 router.get('/:userId/documents/:kind', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, res) => {
@@ -136,14 +126,13 @@ router.patch('/:userId/review', roleGuard('SUPER_ADMIN', 'WORKER'), async (req, 
   const prisma = req.app.locals.prisma;
   const current = await prisma.kyc.findUnique({ where: { userId: req.params.userId } });
   if (!current) return res.status(404).json({ error: 'Verification request not found' });
-  if (!current.selfieDocumentKey || !current.aadhaarDocumentKey || !current.dateOfBirth) return res.status(409).json({ error: 'Both images and date of birth are required before review' });
+  if (!current.selfieDocumentKey || !current.aadhaarDocumentKey) return res.status(409).json({ error: 'Both images are required before review' });
   if (input.status === 'REJECTED' && !input.note) return res.status(400).json({ error: 'Add a reason when rejecting verification' });
   const updated = await prisma.kyc.update({
     where: { userId: current.userId },
     data: {
       status: input.status,
       ageVerified: input.status === 'APPROVED',
-      dateOfBirth: null,
       selfieDocumentKey: null,
       aadhaarDocumentKey: null,
       selfieMimeType: null,
