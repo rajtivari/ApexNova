@@ -23,7 +23,6 @@ ALTER TABLE "Kyc"
   ADD COLUMN "aadhaarDocumentKey" TEXT,
   ADD COLUMN "selfieMimeType" TEXT,
   ADD COLUMN "aadhaarMimeType" TEXT,
-  ADD COLUMN "dateOfBirth" TIMESTAMP(3),
   ADD COLUMN "ageVerified" BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN "reviewedAt" TIMESTAMP(3),
   ADD COLUMN "reviewedById" TEXT,
