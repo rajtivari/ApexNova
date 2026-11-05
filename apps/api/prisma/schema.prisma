@@ -101,7 +101,6 @@ model Kyc {
   aadhaarDocumentKey String?
   selfieMimeType String?
   aadhaarMimeType String?
-  dateOfBirth DateTime?
   ageVerified Boolean @default(false)
   status String @default("NOT_SUBMITTED")
   reviewedAt DateTime?
