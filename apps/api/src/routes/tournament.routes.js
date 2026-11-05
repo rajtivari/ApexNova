@@ -121,12 +121,13 @@ router.post('/:id/register', roleGuard('CAPTAIN', 'PLAYER'), async (req, res) =>
   const prisma = req.app.locals.prisma;
   const tournament = await prisma.tournament.findUnique({
     where: { id: req.params.id },
-    select: { id: true, status: true, startsAt: true, registrationClosesAt: true, entryFee: true },
+    select: { id: true, status: true, startsAt: true, registrationClosesAt: true, entryFee: true, rules: true },
   });
   if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
   if (tournament.status !== 'REGISTRATION_OPEN' || tournament.registrationClosesAt <= new Date()) {
     return res.status(409).json({ error: 'Tournament registration is closed' });
   }
+  if (!tournament.rules?.trim()) return res.status(409).json({ error: 'Tournament rules are not configured yet' });
   if (Number(tournament.entryFee) > 0) {
     return res.status(503).json({ error: 'Paid registration is disabled until a verified payment provider is configured' });
   }
