@@ -37,7 +37,7 @@ export default function AdminPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [form, setForm] = useState({ name: '', game: 'FREE_FIRE', format: 'BATTLE_ROYALE', entryFee: '0', prizePool: '5000', startsAt: '', registrationClosesAt: '' });
+  const [form, setForm] = useState({ name: '', game: 'FREE_FIRE', format: 'BATTLE_ROYALE', entryFee: '0', prizePool: '5000', startsAt: '', registrationClosesAt: '', rules: '' });
 
   const load = useCallback(async (current) => {
     if (!current?.accessToken || current.role !== 'SUPER_ADMIN') { setLoading(false); return; }
@@ -72,16 +72,16 @@ export default function AdminPage() {
 
   async function createTournament(event) {
     event.preventDefault(); setError(''); setMessage('');
-    if (!form.name.trim() || !form.startsAt || !form.registrationClosesAt) return setError('Complete the name, start time, and registration deadline.');
+    if (!form.name.trim() || !form.startsAt || !form.registrationClosesAt || form.rules.trim().length < 10) return setError('Complete the name, tournament rules, start time, and registration deadline.');
     const startsAt = new Date(form.startsAt);
     const registrationClosesAt = new Date(form.registrationClosesAt);
     if (registrationClosesAt >= startsAt) return setError('Registration must close before the tournament starts.');
     if (startsAt <= new Date()) return setError('Choose a future tournament start time.');
     setBusy(true);
     try {
-      const created = await api('/api/tournaments', session.accessToken, { method: 'POST', body: JSON.stringify({ name: form.name.trim(), game: form.game, format: form.format, entryFee: Number(form.entryFee), prizePool: Number(form.prizePool), startsAt: startsAt.toISOString(), registrationClosesAt: registrationClosesAt.toISOString() }) });
+      const created = await api('/api/tournaments', session.accessToken, { method: 'POST', body: JSON.stringify({ name: form.name.trim(), game: form.game, format: form.format, entryFee: Number(form.entryFee), prizePool: Number(form.prizePool), startsAt: startsAt.toISOString(), registrationClosesAt: registrationClosesAt.toISOString(), rules: form.rules.trim() }) });
       setMessage('Tournament created as DRAFT. Publish it, then open registration when ready.');
-      setForm({ name: '', game: 'FREE_FIRE', format: 'BATTLE_ROYALE', entryFee: '0', prizePool: '5000', startsAt: '', registrationClosesAt: '' });
+      setForm({ name: '', game: 'FREE_FIRE', format: 'BATTLE_ROYALE', entryFee: '0', prizePool: '5000', startsAt: '', registrationClosesAt: '', rules: '' });
       await load(session);
     } catch (err) { setError(err.message || 'Could not create tournament.'); }
     finally { setBusy(false); }
@@ -184,6 +184,7 @@ export default function AdminPage() {
           <label className="adminField">ENTRY FEE (₹)<input type="number" min="0" max="1000000" step="1" value={form.entryFee} onChange={(e) => setForm({ ...form, entryFee: e.target.value })} required/></label>
           <label className="adminField">PRIZE POOL (₹)<input type="number" min="0" max="100000000" step="1" value={form.prizePool} onChange={(e) => setForm({ ...form, prizePool: e.target.value })} required/></label>
           <label className="adminField">MATCH START<input type="datetime-local" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} required/></label>
+          <label className="adminField adminFieldWide">TOURNAMENT RULES<textarea value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })} minLength={10} maxLength={5000} rows={5} placeholder="Explain match rules, fair-play requirements, roster limits, check-in, and dispute timing." required/></label>
           <label className="adminField">REGISTRATION CLOSES<input type="datetime-local" value={form.registrationClosesAt} onChange={(e) => setForm({ ...form, registrationClosesAt: e.target.value })} required/></label>
           <div className="adminFormNote"><ShieldCheck size={16}/> New events are saved as DRAFT. Paid entry is not activated by this form.</div>
           <button className="primaryButton adminFormSubmit" type="submit" disabled={busy}>{busy ? 'SAVING EVENT…' : 'CREATE DRAFT TOURNAMENT'} <ArrowRight size={16}/></button>
@@ -204,7 +205,7 @@ export default function AdminPage() {
 
       <section className="playerPanel">
         <div className="playerPanelHeading"><div><p className="eyebrow">SQUAD APPROVAL QUEUE</p><h2>TEAM <span className="ember">REGISTRATIONS.</span></h2></div><Users size={22}/></div>
-        {registrations.filter((row) => row.status === 'PENDING').length === 0 ? <div className="playerEmpty">NO PENDING REGISTRATIONS.</div> : <div className="adminTournamentList">{registrations.filter((row) => row.status === 'PENDING').map((row) => <article className="adminTournamentRow" key={row.id}><div className="adminTournamentIdentity"><span className="adminTournamentGlyph"><Users size={20}/></span><div><h3>{row.team?.name || 'Unknown squad'}</h3><p>{row.tournamentName} · Captain: {row.team?.captain?.profile?.displayName || row.team?.captain?.email || 'Unknown'}</p><small className="adminId">Registration {row.id}</small></div></div><div className="adminTournamentActions"><button className="secondaryButton" disabled={busy} onClick={() => reviewRegistration(row, 'APPROVED')}>APPROVE</button><button className="secondaryButton" disabled={busy} onClick={() => reviewRegistration(row, 'REJECTED')}>REJECT</button></div></article>)}</div>}
+        {registrations.filter((row) => row.status === 'PENDING').length === 0 ? <div className="playerEmpty">NO PENDING REGISTRATIONS.</div> : <div className="adminTournamentList">{registrations.filter((row) => row.status === 'PENDING').map((row) => <article className="adminTournamentRow" key={row.id}><div className="adminTournamentIdentity"><span className="adminTournamentGlyph"><Users size={20}/></span><div><h3>{row.team?.name || 'Unknown squad'}</h3><p>{row.tournamentName} · Captain: {row.team?.captain?.profile?.displayName || row.team?.captain?.email || 'Unknown'}</p><small className="adminId">In-game: {row.inGameName || 'Not provided'} · UID: {row.gameUid || 'Not provided'} · Rules accepted: {row.rulesAcceptedAt ? new Date(row.rulesAcceptedAt).toLocaleString('en-IN') : '—'}</small></div></div><div className="adminTournamentActions"><button className="secondaryButton" disabled={busy} onClick={() => reviewRegistration(row, 'APPROVED')}>APPROVE</button><button className="secondaryButton" disabled={busy} onClick={() => reviewRegistration(row, 'REJECTED')}>REJECT</button></div></article>)}</div>}
       </section>
 
       <section className="playerPanel">
