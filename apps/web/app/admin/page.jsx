@@ -151,7 +151,7 @@ export default function AdminPage() {
     setBusy(true); setError(''); setMessage('');
     try {
       await api('/api/wallet/withdrawals/' + row.id, session.accessToken, { method: 'PATCH', body: JSON.stringify({ status }) });
-      setMessage(status === 'PAID' ? 'Payout marked paid. Send the transfer to the shown UPI ID before confirming.' : 'Payout rejected and prize balance returned.');
+      setMessage(status === 'PAID' ? 'Payout marked paid. Send the transfer to the shown payout destination before confirming.' : 'Payout rejected and prize balance returned.');
       await load(session);
     } catch (err) { setError(err.message || 'Could not review payout.'); }
     finally { setBusy(false); }
@@ -317,7 +317,7 @@ export default function AdminPage() {
 
       <section className="playerPanel">
         <div className="playerPanelHeading"><div><p className="eyebrow">PAYOUT REVIEW</p><h2>WALLET <span className="ember">WITHDRAWALS.</span></h2></div><Wallet size={22}/></div>
-        {withdrawals.length === 0 ? <div className="playerEmpty">NO PAYOUT REQUESTS WAITING.</div> : <div className="adminTournamentList">{withdrawals.map((row) => <article className="adminTournamentRow" key={row.id}><div className="adminTournamentIdentity"><span className="adminTournamentGlyph"><Wallet size={20}/></span><div><h3>{money(row.amount)} · {row.user?.profile?.displayName || row.user?.email}</h3><p>Send to {row.payoutDestination}</p><small className="adminId">Requested {new Date(row.createdAt).toLocaleString('en-IN')}</small></div></div><div className="adminTournamentActions"><button className="secondaryButton" disabled={busy} onClick={() => reviewWithdrawal(row, 'PAID')}>MARK PAID</button><button className="secondaryButton" disabled={busy} onClick={() => reviewWithdrawal(row, 'REJECTED')}>REJECT & REFUND</button></div></article>)}</div>}
+        {withdrawals.length === 0 ? <div className="playerEmpty">NO PAYOUT REQUESTS WAITING.</div> : <div className="adminTournamentList">{withdrawals.map((row) => <article className="adminTournamentRow" key={row.id}><div className="adminTournamentIdentity"><span className="adminTournamentGlyph"><Wallet size={20}/></span><div><h3>{money(row.amount)} · {row.user?.profile?.displayName || row.user?.email}</h3><p>{row.payoutMethod === 'BANK' ? 'Bank transfer' : 'UPI'} · Send to {row.payoutDestination}</p><small className="adminId">Requested {new Date(row.createdAt).toLocaleString('en-IN')}</small></div></div><div className="adminTournamentActions"><button className="secondaryButton" disabled={busy} onClick={() => reviewWithdrawal(row, 'PAID')}>MARK PAID</button><button className="secondaryButton" disabled={busy} onClick={() => reviewWithdrawal(row, 'REJECTED')}>REJECT & REFUND</button></div></article>)}</div>}
         <p className="playerPanelFoot"><ShieldCheck size={15}/> Send the payout first, then mark it paid. Rejections release the reserved wallet balance.</p>
       </section>
 
