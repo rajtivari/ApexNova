@@ -33,14 +33,14 @@ router.post('/withdraw', async (req, res) => {
   if (kyc?.status !== 'APPROVED') return res.status(403).json({ error: 'Complete approved identity and age verification before requesting a payout' });
 
   const result = await prisma.$transaction(async (tx) => {
-    const wallet = await tx.wallet.findUnique({ where: { userId: req.user.id } });
-    if (!wallet || Number(wallet.balance) < input.amount) return null;
-    const transaction = await tx.transaction.create({
-      data: { userId: req.user.id, walletId: wallet.id, type: 'WITHDRAWAL', amount: input.amount, status: 'PENDING' },
-    });
-    const updatedWallet = await tx.wallet.update({
-      where: { id: wallet.id },
+    const reserved = await tx.wallet.updateMany({
+      where: { userId: req.user.id, balance: { gte: input.amount } },
       data: { balance: { decrement: input.amount } },
+    });
+    if (reserved.count !== 1) return null;
+    const updatedWallet = await tx.wallet.findUnique({ where: { userId: req.user.id } });
+    const transaction = await tx.transaction.create({
+      data: { userId: req.user.id, walletId: updatedWallet.id, type: 'WITHDRAWAL', amount: input.amount, status: 'PENDING' },
     });
     const request = await tx.withdrawalRequest.create({
       data: {
