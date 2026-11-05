@@ -2,7 +2,7 @@
 
 ApexNova is an eSports tournament operations platform for Free Fire and BGMI. The repository contains a Next.js static frontend, an Express API, and a PostgreSQL/Prisma data model.
 
-**Payments, KYC, proof uploads, and game-room integrations are not connected to live providers.** Wallet deposits are explicitly mock-only. Do not use this build to handle real money or sensitive identity documents.
+**Manual UPI entry confirmation and private identity-review workflows are feature-gated.** UPI is verified by staff against the payment account; there is no payment-provider webhook. Identity images are encrypted in a configured private persistent directory and deleted after staff review. Do not enable either flow until the required registrations, operational controls, and hosting configuration are in place.
 
 ## Implemented
 
@@ -10,9 +10,9 @@ ApexNova is an eSports tournament operations platform for Free Fire and BGMI. Th
 - Server-issued roles; public registration can create player accounts only.
 - Super-admin bootstrap script that reads credentials from environment variables.
 - Team creation, roster membership, tournament listing and lifecycle controls.
-- Free tournament registration with staff approval/rejection.
+- Tournament rules, player game UID/in-game name, and recorded rules acceptance on registration.\n- Free tournament registration with staff approval/rejection; paid entry can use a configured UPI QR and UTR reference with separate staff payment review.
 - Match creation, team-scoped result submissions, staff result review, standings recalculation, and dispute resolution.
-- User-scoped notifications and super-admin-only mock wallet operations.
+- User-scoped notifications, an approved-prize wallet ledger, super-admin prize credits, and UPI withdrawal requests with balance reservation and staff payout review.\n- Optional private identity and age review: encrypted selfie and masked Aadhaar images, admin-only access, deletion after review, and retention of the age-verification outcome only.
 - Audit logging, safe API error responses, production configuration checks, database health endpoint, and graceful shutdown.
 - GitHub Actions checks for API syntax, unit tests, Prisma validation/client generation, and migrations against a clean PostgreSQL instance.
 - GitHub Pages base-path and PWA fixes; frontend authentication and data views use the configured API rather than role-switching mock data.
@@ -51,6 +51,17 @@ Requirements: Node.js 20+, npm, and PostgreSQL.
    ~~~
 
 The web app runs at http://localhost:3000; the API runs at http://localhost:4000. The API health endpoint is /api/health.
+
+
+### Payments, prize wallet, and identity review
+
+Paid entry is off by default. To enable manual UPI entry review, configure `PAYMENTS_ENABLED=true`, `ESPORTS_REGISTRATION_ID`, and `UPI_QR_URL` on the API. For the static frontend build, set `NEXT_PUBLIC_UPI_QR_URL` to the same public QR image. Players submit the UTR; staff must verify it against the payment account before approving the registration. Do not rely on a submitted UTR alone as proof of payment.
+
+The wallet tracks approved prize credits and payout requests; it does not accept wallet top-ups. Players request withdrawals to a UPI ID, which is encrypted at rest. Staff send the payout separately, then mark it paid. Rejected requests return the reserved prize balance.
+
+Identity upload is off by default. Enable it only after configuring `KYC_UPLOADS_ENABLED=true`, `UIDAI_OVSE_ID`, `KYC_PRIVATE_STORAGE_DIR` on a persistent private volume, and `DATA_ENCRYPTION_KEY` as a 32-byte hex key. Set the matching static build variable `NEXT_PUBLIC_KYC_UPLOADS_ENABLED=true`. Never point KYC storage at a public directory. The app accepts a selfie, date of birth, and masked Aadhaar image, limits each image to 2 MB, encrypts files with AES-256-GCM, gives image access only to staff, and deletes the images and date of birth after the decision. It retains only the review status and age-verified flag. Admin image review is manual; it does not verify UIDAI's signed QR credential.
+
+Example key generation for a secure deployment: `openssl rand -hex 32`. Store the result in deployment secrets; do not commit it to Git. Use a private persistent storage volume with restricted access and backups appropriate for the retention period.
 
 ## Database migration note
 
