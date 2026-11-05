@@ -133,6 +133,7 @@ model Tournament {
   prizePool Decimal @default(0)
   startsAt DateTime
   registrationClosesAt DateTime
+  rules String @default("")
   registrations TournamentRegistration[]
   matches Match[]
   standings Standing[]
