@@ -34,7 +34,7 @@ export default function PlayerPage() {
   const [matches, setMatches] = useState([]);
   const [wallet, setWallet] = useState({ balance: 0, transactions: [] });
   const [kyc, setKyc] = useState({ status: 'NOT_SUBMITTED' });
-  const [kycForm, setKycForm] = useState({ dateOfBirth: '', selfie: null, aadhaarImage: null, consent: false });
+  const [kycForm, setKycForm] = useState({ selfie: null, aadhaarImage: null, consent: false });
   const [withdrawForm, setWithdrawForm] = useState({ amount: '', upiVpa: '' });
   const [teamName, setTeamName] = useState('');
   const [memberEmail, setMemberEmail] = useState('');
@@ -187,7 +187,7 @@ export default function PlayerPage() {
     event.preventDefault(); const formElement = event.currentTarget; setBusy(true); setError(''); setMessage('');
     try {
       await api('/api/kyc/me', session.accessToken, { method: 'POST', body: JSON.stringify(kycForm) });
-      setKycForm({ dateOfBirth: '', selfie: null, aadhaarImage: null, consent: false });
+      setKycForm({ selfie: null, aadhaarImage: null, consent: false });
       formElement.reset();
       setMessage('Identity and age documents sent for private staff review.');
       await load(session);
@@ -306,12 +306,11 @@ export default function PlayerPage() {
       </div>}
       <section className="playerPanel">
         <div className="playerPanelHeading"><div><p className="eyebrow">PLAYER IDENTITY / AGE 18+</p><h2>IDENTITY <span className="ember">CHECK.</span></h2></div><ShieldCheck size={22}/></div>
-        <div className="playerIdentityStatus"><span className={'adminStatusPill ' + (kyc.status === 'APPROVED' ? 'adminStatusLive' : '')}>{String(kyc.status || 'NOT_SUBMITTED').replaceAll('_', ' ')}</span><span>{kyc.ageVerified ? 'Age 18+ verified.' : kyc.dateOfBirth ? 'Date of birth submitted for review.' : 'No date of birth submitted.'}</span>{kyc.reviewNote && <small>{kyc.reviewNote}</small>}</div>
+        <div className="playerIdentityStatus"><span className={'adminStatusPill ' + (kyc.status === 'APPROVED' ? 'adminStatusLive' : '')}>{String(kyc.status || 'NOT_SUBMITTED').replaceAll('_', ' ')}</span><span>{kyc.ageVerified ? 'Age verified by staff.' : 'Age will be checked by staff from your Aadhaar image.'}</span>{kyc.reviewNote && <small>{kyc.reviewNote}</small>}</div>
         {kyc.status !== 'APPROVED' && <form className="playerIdentityForm" onSubmit={submitKyc}>
-          <label>DATE OF BIRTH<input type="date" value={kycForm.dateOfBirth} onChange={(event) => setKycForm({ ...kycForm, dateOfBirth: event.target.value })} required /></label>
           <label>SELFIE PHOTO<input type="file" accept="image/jpeg,image/png" onChange={(event) => setKycImage('selfie', event.target.files?.[0])} required /></label>
           <label>MASKED AADHAAR CARD PHOTO<input type="file" accept="image/jpeg,image/png" onChange={(event) => setKycImage('aadhaarImage', event.target.files?.[0])} required /><small>Hide the first 8 digits before uploading. JPEG/PNG, up to 2 MB.</small></label>
-          <label className="playerKycConsent"><input type="checkbox" checked={kycForm.consent} onChange={(event) => setKycForm({ ...kycForm, consent: event.target.checked })} required /><span>I consent to ApexNova using these images and my date of birth only for identity and age verification. They are encrypted, visible only to authorized reviewers, and deleted after review.</span></label>
+          <label className="playerKycConsent"><input type="checkbox" checked={kycForm.consent} onChange={(event) => setKycForm({ ...kycForm, consent: event.target.checked })} required /><span>I consent to ApexNova using these images only for identity and age verification. They are encrypted, visible only to authorized reviewers, and deleted after review.</span></label>
           <button className="primaryButton" type="submit" disabled={busy || !KYC_UPLOADS_ENABLED}>{busy ? 'SUBMITTING…' : 'SEND FOR ADMIN REVIEW'} <ArrowRight size={15}/></button>
           {!KYC_UPLOADS_ENABLED && <small className="fieldNote warning">Secure identity storage is not configured on this deployment yet.</small>}
         </form>}
