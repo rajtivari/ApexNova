@@ -829,3 +829,21 @@ body { background:#02020c; color:#e8e8ff; font-family:'Exo 2','Space Grotesk',sa
  .nova-site .tournament-grid { grid-template-columns:1fr; }
  .nova-site .card-content { padding:15px; }
 }
+
+
+/* Tournament join flow: rules, game identity, and explicit consent. */
+.playerJoinBackdrop { position:fixed; inset:0; z-index:100; display:grid; place-items:center; overflow:auto; padding:20px; background:#03060be8; backdrop-filter:blur(8px); }
+.playerJoinModal { width:min(620px,100%); max-height:min(92vh,900px); overflow:auto; padding:24px; color:var(--bone); background:linear-gradient(145deg,#151d20,#0e1317); border:1px solid #435356; box-shadow:0 25px 100px #000a; }
+.playerJoinHeading { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:18px; }
+.playerJoinHeading h2 { margin:8px 0 0; font:800 clamp(24px,5vw,36px)/1 'Barlow Condensed',sans-serif; overflow-wrap:anywhere; }
+.playerJoinHeading .closeButton { flex:none; display:grid; place-items:center; width:34px; height:34px; border:1px solid var(--line); background:#1a2427; color:var(--bone); cursor:pointer; font-size:22px; }
+.playerRulesBox { max-height:220px; overflow:auto; white-space:pre-wrap; padding:15px; margin-bottom:16px; border:1px solid #384448; background:#090e11; }
+.playerRulesBox strong { color:var(--cyan); font:11px 'Share Tech Mono',monospace; letter-spacing:.08em; }
+.playerRulesBox p { color:#c7cec6; font-size:12px; line-height:1.7; margin:10px 0 0; }
+.playerJoinField { display:grid; gap:7px; margin:13px 0; color:#aab5b0; font:10px 'Share Tech Mono',monospace; letter-spacing:.06em; }
+.playerJoinField input { width:100%; min-height:44px; padding:10px 12px; color:var(--bone); background:#080d0f; border:1px solid #344145; font:14px 'Space Grotesk',sans-serif; }
+.playerRulesAccept { display:flex; gap:10px; align-items:flex-start; margin:17px 0; padding:13px; border:1px solid #344145; background:#101719; color:#c7cec6; font-size:12px; line-height:1.6; cursor:pointer; }
+.playerRulesAccept input { margin-top:3px; accent-color:var(--cyan); }
+.playerJoinNote { color:#899691; font-size:11px; }
+.playerJoinActions { display:flex; justify-content:flex-end; gap:9px; margin-top:17px; }
+@media(max-width:520px) { .playerJoinBackdrop { padding:10px; align-items:end; }.playerJoinModal { padding:18px; max-height:94vh; }.playerJoinActions { flex-direction:column-reverse; }.playerJoinActions button { width:100%; justify-content:center; } }
