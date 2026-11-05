@@ -225,7 +225,7 @@ router.patch('/:id/registrations/:registrationId', roleGuard('SUPER_ADMIN', 'WOR
   const prisma = req.app.locals.prisma;
   const registration = await prisma.tournamentRegistration.findFirst({
     where: { id: req.params.registrationId, tournamentId: req.params.id },
-    include: { tournament: { select: { status: true } } },
+    include: { tournament: { select: { status: true, entryFee: true } } },
   });
   if (!registration) return res.status(404).json({ error: 'Registration not found' });
   if (!['REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(registration.tournament.status)) {
