@@ -179,6 +179,12 @@ model TournamentRegistration {
   tournamentId String
   teamId String
   status RegistrationStatus @default(PENDING)
+  paymentStatus RegistrationPaymentStatus @default(NOT_REQUIRED)
+  paymentReference String? @unique
+  paymentReviewedAt DateTime?
+  gameUid String?
+  inGameName String?
+  rulesAcceptedAt DateTime?
   tournament Tournament @relation(fields: [tournamentId], references: [id])
   team Team @relation(fields: [teamId], references: [id])
   @@unique([tournamentId, teamId])
