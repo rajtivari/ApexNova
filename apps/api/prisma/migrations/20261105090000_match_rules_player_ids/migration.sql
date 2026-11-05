@@ -34,6 +34,7 @@ CREATE TABLE "WithdrawalRequest" (
   "transactionId" TEXT NOT NULL,
   "amount" DECIMAL(65,30) NOT NULL,
   "encryptedDestination" TEXT NOT NULL,
+  "destinationType" TEXT NOT NULL DEFAULT 'UPI',
   "maskedDestination" TEXT NOT NULL,
   "status" "WithdrawalStatus" NOT NULL DEFAULT 'PENDING',
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
